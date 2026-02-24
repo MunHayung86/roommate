@@ -58,7 +58,10 @@ class _LoginPageState extends State<LoginPage> {
                   width: 330,
                   height: 60,
                   child: OutlinedButton(
-                    onPressed: _signInWithGoogle,
+                    // onPressed: _signInWithGoogle,
+                    onPressed: () {
+                      Navigator.pushReplacementNamed(context, '/room_select');
+                    },
                     style: OutlinedButton.styleFrom(
                       backgroundColor: const Color.fromARGB(255, 255, 255, 255),
                       side: BorderSide.none,
