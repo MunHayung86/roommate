@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:share_plus/share_plus.dart';
 
 class ShareRoomCodePage extends StatefulWidget {
-  const ShareRoomCodePage({super.key});
+  final String roomCode;
+
+  const ShareRoomCodePage({super.key, required this.roomCode});
 
   @override
   State<ShareRoomCodePage> createState() => _ShareRoomCodePageState();
@@ -37,7 +41,7 @@ class _ShareRoomCodePageState extends State<ShareRoomCodePage> {
                   children: [
                     Text('방코드', style: TextStyle(fontSize: 14,),),
                     SizedBox(height: 10,),
-                    Text('A1B2C3', style: TextStyle(fontSize: 36, fontWeight: FontWeight.bold),),
+                    Text(widget.roomCode, style: TextStyle(fontSize: 36, fontWeight: FontWeight.bold),),
                   ],
                 ),
               ),
@@ -46,12 +50,24 @@ class _ShareRoomCodePageState extends State<ShareRoomCodePage> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   ElevatedButton(
-                    onPressed: () {}, 
+                    onPressed: () {
+                      Clipboard.setData(ClipboardData(text: widget.roomCode));
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('코드가 복사되었습니다!')),
+                      );
+                    }, 
                     child: Text('코드 복사', style: TextStyle(fontSize: 16,))
                   ),
                   SizedBox(width: 10,),
                   ElevatedButton(
-                    onPressed: () {}, 
+                    onPressed: () {
+                      // Share.share('같이 방 들어와요! 방 코드: ${widget.roomCode}');
+                      SharePlus.instance.share(
+                        ShareParams(
+                          text: '같이 방 들어와요! 방 코드: ${widget.roomCode}',
+                        ),
+                      );
+                    }, 
                     child: Text('공유하기', style: TextStyle(fontSize: 16,))
                   ),
                 ],
@@ -63,7 +79,7 @@ class _ShareRoomCodePageState extends State<ShareRoomCodePage> {
                 child: ElevatedButton(
                   onPressed: () {
                     Navigator.pushNamed(context, '/survey');
-                  }, 
+                  },
                   child: Text('다음으로', style: TextStyle(fontSize: 16,))
                 ),
               ),

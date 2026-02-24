@@ -35,9 +35,19 @@ class MyApp extends StatelessWidget {
         '/room_select': (context) => const RoomSelectPage(),
         '/create_room': (context) => const CreateRoomPage(),
         '/join_room': (context) => const JoinRoomPage(),
-        '/share_room_code': (context) => const ShareRoomCodePage(),
         '/survey': (context) => const SurveyPage(),
       },
-    );
+      onGenerateRoute: (settings) {
+        if (settings.name == '/share_room_code') {
+          final roomCode = settings.arguments as String;
+
+          return MaterialPageRoute(
+            builder: (_) => ShareRoomCodePage(roomCode: roomCode),
+          );
+        }
+        return null;
+      },
+    )
+    ;
   }
-}
+} 
