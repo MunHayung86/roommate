@@ -1,4 +1,17 @@
 import 'package:flutter/material.dart';
+import 'dart:math';
+
+String generateRoomCode() {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  final rand = Random();
+
+  return String.fromCharCodes(
+    Iterable.generate(
+      6,
+      (_) => chars.codeUnitAt(rand.nextInt(chars.length)),
+    ),
+  );
+}
 
 class CreateRoomPage extends StatefulWidget {
   const CreateRoomPage({super.key});
@@ -54,9 +67,14 @@ class _CreateRoomPageState extends State<CreateRoomPage> {
                 height: 50,
                 width: double.infinity,
                 child: ElevatedButton(
-                  onPressed: () {
-                    Navigator.pushNamed(context, '/share_room_code');
-                  }, 
+                  onPressed: () {     
+                    final code = generateRoomCode();
+                    Navigator.pushNamed(
+                      context,
+                      '/share_room_code',
+                      arguments: code,
+                    );
+                  },                  
                   child: Text('생성하기', style: TextStyle(fontSize: 16,))
                 ),
               ),

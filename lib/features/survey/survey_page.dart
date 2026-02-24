@@ -15,7 +15,7 @@ class _SurveyPageState extends State<SurveyPage> {
       body: SingleChildScrollView(
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 24),
-          
+          child: Text('survey'),
         ),
       ),
     );
