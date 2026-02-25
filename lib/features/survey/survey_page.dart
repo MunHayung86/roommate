@@ -1,23 +1,15 @@
 import 'package:flutter/material.dart';
 
-class SurveyPage extends StatefulWidget {
+import 'data/lifestyle_questions.dart';
+import 'pages/lifestyle_survey_page.dart';
+
+class SurveyPage extends StatelessWidget {
   const SurveyPage({super.key});
 
   @override
-  State<SurveyPage> createState() => _SurveyPageState();
-}
-
-class _SurveyPageState extends State<SurveyPage> {
-  @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.white,
-      body: SingleChildScrollView(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24),
-          child: Text('survey'),
-        ),
-      ),
+    return const LifestyleSurveyPage(
+      questions: kLifestyleQuestions,
     );
   }
 }
