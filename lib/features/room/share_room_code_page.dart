@@ -61,7 +61,12 @@ class _ShareRoomCodePageState extends State<ShareRoomCodePage> {
                   SizedBox(width: 10,),
                   ElevatedButton(
                     onPressed: () {
-                      Share.share('같이 방 들어와요! 방 코드: ${widget.roomCode}');
+                      // Share.share('같이 방 들어와요! 방 코드: ${widget.roomCode}');
+                      SharePlus.instance.share(
+                        ShareParams(
+                          text: '같이 방 들어와요! 방 코드: ${widget.roomCode}',
+                        ),
+                      );
                     }, 
                     child: Text('공유하기', style: TextStyle(fontSize: 16,))
                   ),
