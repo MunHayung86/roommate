@@ -116,7 +116,8 @@ class _ShareRoomCodePageState extends State<ShareRoomCodePage> {
                         onTap: () {
                           SharePlus.instance.share(
                             ShareParams(
-                              text: '같이 방 들어와요! 방 코드: ${widget.roomCode}',
+                              text: '방에 참여해 규칙을 정하세요! \n방 코드: ${widget.roomCode}',
+                              subject: '방 초대 코드 공유',
                             ),
                           );
                         },

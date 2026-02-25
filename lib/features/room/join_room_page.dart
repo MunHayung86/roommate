@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:roommate/features/room/room_service.dart';
 
 class JoinRoomPage extends StatefulWidget {
   const JoinRoomPage({super.key});
@@ -10,6 +11,8 @@ class JoinRoomPage extends StatefulWidget {
 class _JoinRoomPageState extends State<JoinRoomPage> {
   final TextEditingController roomCodeController = TextEditingController();
   bool isButtonEnabled = false;
+  String? _errorMessage;
+  final RoomService _roomService = RoomService();
 
   @override
   void initState() {
@@ -22,6 +25,7 @@ class _JoinRoomPageState extends State<JoinRoomPage> {
     final valid = RegExp(r'^[A-Za-z0-9]{6}$'); 
     setState(() {
       isButtonEnabled = valid.hasMatch(input);
+      _errorMessage = null;
     });
   }
 
@@ -79,6 +83,16 @@ class _JoinRoomPageState extends State<JoinRoomPage> {
                   ),
                 ),
               ),
+              if (_errorMessage != null) ...[
+                const SizedBox(height: 6),
+                Text(
+                  _errorMessage!,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    color: Colors.red,
+                  ),
+                ),
+              ],
               SizedBox(height: 25),
               Container(
                 height: 56,
@@ -106,8 +120,20 @@ class _JoinRoomPageState extends State<JoinRoomPage> {
                   child: InkWell(
                     borderRadius: BorderRadius.circular(16),
                     onTap: isButtonEnabled
-                        ? () {
-                            Navigator.pushReplacementNamed(context, '/home');
+                        ? () async {
+                            final String code =
+                                roomCodeController.text.trim().toUpperCase();
+                            try {
+                              await _roomService.joinRoomByInviteCode(code);
+
+                              if (!mounted) return;
+                              Navigator.pushReplacementNamed(context, '/home');
+                            } catch (e) {
+                              if (!mounted) return;
+                              setState(() {
+                                _errorMessage = '존재하지 않는 룸코드입니다.';
+                              });
+                            }
                           }
                         : null,
                     child: Center(

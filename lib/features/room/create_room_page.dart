@@ -1,17 +1,5 @@
 import 'package:flutter/material.dart';
-import 'dart:math';
-
-String generateRoomCode() {
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-  final rand = Random();
-
-  return String.fromCharCodes(
-    Iterable.generate(
-      6,
-      (_) => chars.codeUnitAt(rand.nextInt(chars.length)),
-    ),
-  );
-}
+import 'package:roommate/features/room/room_service.dart';
 
 class CreateRoomPage extends StatefulWidget {
   const CreateRoomPage({super.key});
@@ -23,6 +11,7 @@ class CreateRoomPage extends StatefulWidget {
 class _CreateRoomPageState extends State<CreateRoomPage> {
   final TextEditingController roomNameController = TextEditingController();
   final TextEditingController roomMottoController = TextEditingController();
+  final RoomService _roomService = RoomService();
   
   bool isButtonEnabled = false;
 
@@ -154,13 +143,32 @@ class _CreateRoomPageState extends State<CreateRoomPage> {
                   child: InkWell(
                     borderRadius: BorderRadius.circular(16),
                     onTap: isButtonEnabled
-                        ? () {
-                            final code = generateRoomCode();
-                            Navigator.pushNamed(
-                              context,
-                              '/share_room_code',
-                              arguments: code,
-                            );
+                        ? () async {
+                            final String name = roomNameController.text.trim();
+                            final String motto = roomMottoController.text.trim();
+
+                            try {
+                              final String code = await _roomService.createRoom(
+                                name: name,
+                                motto: motto,
+                              );
+
+                              if (!mounted) return;
+
+                              Navigator.pushNamed(
+                                context,
+                                '/share_room_code',
+                                arguments: code,
+                              );
+                            } catch (e) {
+                              if (!mounted) return;
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content:
+                                      Text('방 생성에 실패했어요. 잠시 후 다시 시도해주세요.'),
+                                ),
+                              );
+                            }
                           }
                         : null,
                     child: Center(
