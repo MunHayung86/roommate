@@ -21,7 +21,15 @@ class _HomePageState extends State<HomePage> {
               SizedBox(height: 70,),
               Text('302호', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),),
               SizedBox(height: 8,),
-              Text('사람답게 살자', style: TextStyle(fontSize: 16,),),
+              Container(
+                width: 320,
+                height: 80,
+                decoration: BoxDecoration(
+                  color: Color.fromARGB(255, 250, 235, 255),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text('사람답게 살자', style: TextStyle(fontSize: 16,),)
+              ),
               SizedBox(height: 40,),
             ],
           ),
