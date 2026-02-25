@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../models/survey_question.dart';
-import '../widgets/simple_time_select_card.dart';
 import '../widgets/survey_option_button.dart';
 import '../widgets/survey_progress_header.dart';
 
@@ -20,14 +20,14 @@ class LifestyleSurveyPage extends StatefulWidget {
 }
 
 class _LifestyleSurveyPageState extends State<LifestyleSurveyPage> {
-  static const List<int> _hours = <int>[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
-  static const List<int> _minutes = <int>[0, 10, 20, 30, 40, 50];
-  static const List<String> _periods = <String>['오전', '오후'];
-
   int _currentIndex = 0;
   final Map<String, String> _answers = <String, String>{};
-  TimeOfDay? _bedTime;
-  TimeOfDay? _wakeTime;
+  List<_RecommendedRule> _recommendedRules = <_RecommendedRule>[];
+  int? _editingRuleIndex;
+  String _editingRuleDraft = '';
+  bool _isEditingBedTime = true;
+  TimeOfDay? _bedTime = const TimeOfDay(hour: 23, minute: 0);
+  TimeOfDay? _wakeTime = const TimeOfDay(hour: 7, minute: 0);
 
   int _displayHour(TimeOfDay time) {
     final int hour = time.hour % 12;
@@ -38,85 +38,44 @@ class _LifestyleSurveyPageState extends State<LifestyleSurveyPage> {
     return time.hour < 12 ? '오전' : '오후';
   }
 
-  int _to24Hour({required int displayHour, required String period}) {
-    final int normalizedHour = displayHour % 12;
-    return period == '오전' ? normalizedHour : normalizedHour + 12;
-  }
-
   SurveyQuestion get _currentQuestion => widget.questions[_currentIndex];
 
-  Future<void> _tryCompleteSleepQuestion() async {
+  void _syncSleepAnswer() {
+    if (!_currentQuestion.requiresTimeInput) {
+      return;
+    }
+
     if (_bedTime == null || _wakeTime == null) {
+      _answers.remove(_currentQuestion.id);
       return;
     }
 
     _answers[_currentQuestion.id] = '취침 ${_formatTime(_bedTime!)} / 기상 ${_formatTime(_wakeTime!)}';
-    await Future<void>.delayed(const Duration(milliseconds: 150));
-    _goToNextQuestion();
   }
 
-  Future<void> _updateBedPeriod(String period) async {
-    final TimeOfDay current = _bedTime ?? const TimeOfDay(hour: 23, minute: 0);
+  Future<void> _onOptionSelected(String option) async {
+    final String questionId = _currentQuestion.id;
     setState(() {
-      _bedTime = TimeOfDay(
-        hour: _to24Hour(displayHour: _displayHour(current), period: period),
-        minute: current.minute,
-      );
+      _answers[questionId] = option;
     });
-    await _tryCompleteSleepQuestion();
-  }
 
-  Future<void> _updateBedHour(int hour) async {
-    final TimeOfDay current = _bedTime ?? const TimeOfDay(hour: 23, minute: 0);
-    setState(() {
-      _bedTime = TimeOfDay(
-        hour: _to24Hour(displayHour: hour, period: _periodLabel(current)),
-        minute: current.minute,
-      );
-    });
-    await _tryCompleteSleepQuestion();
-  }
+    await Future<void>.delayed(const Duration(milliseconds: 220));
+    if (!mounted) {
+      return;
+    }
 
-  Future<void> _updateBedMinute(int minute) async {
-    final TimeOfDay current = _bedTime ?? const TimeOfDay(hour: 23, minute: 0);
-    setState(() {
-      _bedTime = TimeOfDay(hour: current.hour, minute: minute);
-    });
-    await _tryCompleteSleepQuestion();
-  }
+    if (_currentIndex >= widget.questions.length) {
+      return;
+    }
 
-  Future<void> _updateWakePeriod(String period) async {
-    final TimeOfDay current = _wakeTime ?? const TimeOfDay(hour: 7, minute: 0);
-    setState(() {
-      _wakeTime = TimeOfDay(
-        hour: _to24Hour(displayHour: _displayHour(current), period: period),
-        minute: current.minute,
-      );
-    });
-    await _tryCompleteSleepQuestion();
-  }
+    if (_currentQuestion.id != questionId) {
+      return;
+    }
 
-  Future<void> _updateWakeHour(int hour) async {
-    final TimeOfDay current = _wakeTime ?? const TimeOfDay(hour: 7, minute: 0);
-    setState(() {
-      _wakeTime = TimeOfDay(
-        hour: _to24Hour(displayHour: hour, period: _periodLabel(current)),
-        minute: current.minute,
-      );
-    });
-    await _tryCompleteSleepQuestion();
-  }
+    if (_answers[questionId] != option) {
+      return;
+    }
 
-  Future<void> _updateWakeMinute(int minute) async {
-    final TimeOfDay current = _wakeTime ?? const TimeOfDay(hour: 7, minute: 0);
-    setState(() {
-      _wakeTime = TimeOfDay(hour: current.hour, minute: minute);
-    });
-    await _tryCompleteSleepQuestion();
-  }
-
-  void _onOptionSelected(String option) {
-    _answers[_currentQuestion.id] = option;
     _goToNextQuestion();
   }
 
@@ -135,6 +94,7 @@ class _LifestyleSurveyPageState extends State<LifestyleSurveyPage> {
       widget.onCompleted?.call(Map<String, String>.from(_answers));
       setState(() {
         _currentIndex = widget.questions.length;
+        _recommendedRules = _generateRecommendedRules(_answers);
       });
       return;
     }
@@ -144,10 +104,129 @@ class _LifestyleSurveyPageState extends State<LifestyleSurveyPage> {
     });
   }
 
+  bool _canGoNext() {
+    if (_currentQuestion.requiresTimeInput) {
+      return _bedTime != null && _wakeTime != null;
+    }
+    return _answers.containsKey(_currentQuestion.id);
+  }
+
+  void _onNextPressed() {
+    if (!_canGoNext()) {
+      return;
+    }
+    _syncSleepAnswer();
+    _goToNextQuestion();
+  }
+
   String _formatTime(TimeOfDay time) {
     final String hour = _displayHour(time).toString().padLeft(2, '0');
     final String minute = time.minute.toString().padLeft(2, '0');
     return '${_periodLabel(time)} $hour:$minute';
+  }
+
+  Future<void> _setManualTime({
+    required bool isBedTime,
+    required TimeOfDay time,
+  }) async {
+    setState(() {
+      if (isBedTime) {
+        _bedTime = time;
+        _isEditingBedTime = true;
+      } else {
+        _wakeTime = time;
+        _isEditingBedTime = false;
+      }
+    });
+
+    _syncSleepAnswer();
+  }
+
+  List<_RecommendedRule> _generateRecommendedRules(Map<String, String> answers) {
+    final List<String> ruleTexts = <String>[
+      '손님 초대 시 사전에 룸메이트에게 알립니다.',
+      '공용 물건 사용 후 원래 자리에 돌려놓습니다.',
+      '개인 통화는 이어폰 사용을 권장합니다.',
+    ];
+
+    final String? food = answers['food_in_room'];
+    if (food == '냄새 강한 음식은 불가') {
+      ruleTexts.add('냄새가 강한 음식은 공용공간에서만 섭취합니다.');
+    } else if (food == '방 안 음식 자체 불호') {
+      ruleTexts.add('방 안에서는 음식 섭취를 하지 않습니다.');
+    }
+
+    final String? alarm = answers['alarm_style'];
+    if (alarm == '2~3회 이내로만 울렸으면 좋겠다') {
+      ruleTexts.add('아침 알람은 최대 2~3회 이내로 설정합니다.');
+    }
+
+    final String? keyboard = answers['keyboard_sound'];
+    if (keyboard == '밤 시간대 제한 필요') {
+      ruleTexts.add('밤 시간대에는 키보드/타자 소음을 최소화합니다.');
+    }
+
+    final String? standLight = answers['stand_light_after_quiet'];
+    if (standLight == '낮은 밝기로만 사용 가능') {
+      ruleTexts.add('취침 시간 이후 조명은 낮은 밝기로만 사용합니다.');
+    } else if (standLight == '사용 금지') {
+      ruleTexts.add('취침 시간 이후에는 스탠드 조명을 사용하지 않습니다.');
+    }
+
+    final String? returnHome = answers['return_home_style'];
+    if (returnHome == '새벽 1~2시 귀가 잦음' || returnHome == '일정이 불규칙함') {
+      ruleTexts.add('늦은 귀가 시에는 미리 메시지로 공유합니다.');
+    }
+
+    if (answers.containsKey('sleep_time')) {
+      ruleTexts.add('서로의 취침/기상 시간을 존중해 소음을 줄입니다.');
+    }
+
+    final List<String> uniqueTexts = ruleTexts.toSet().toList();
+    return List<_RecommendedRule>.generate(
+      uniqueTexts.length,
+      (int index) => _RecommendedRule(
+        text: uniqueTexts[index],
+        isSelected: index < 3,
+      ),
+    );
+  }
+
+  void _toggleRule(int index) {
+    setState(() {
+      final _RecommendedRule current = _recommendedRules[index];
+      _recommendedRules[index] = current.copyWith(isSelected: !current.isSelected);
+    });
+  }
+
+  void _startEditRule(int index) {
+    setState(() {
+      _editingRuleIndex = index;
+      _editingRuleDraft = _recommendedRules[index].text;
+    });
+  }
+
+  void _cancelEditRule() {
+    setState(() {
+      _editingRuleIndex = null;
+      _editingRuleDraft = '';
+    });
+  }
+
+  void _confirmEditRule() {
+    final int? index = _editingRuleIndex;
+    if (index == null) {
+      return;
+    }
+    final String trimmed = _editingRuleDraft.trim();
+    if (trimmed.isEmpty) {
+      return;
+    }
+    setState(() {
+      _recommendedRules[index] = _recommendedRules[index].copyWith(text: trimmed);
+      _editingRuleIndex = null;
+      _editingRuleDraft = '';
+    });
   }
 
   @override
@@ -155,6 +234,7 @@ class _LifestyleSurveyPageState extends State<LifestyleSurveyPage> {
     final bool isComplete = _currentIndex >= widget.questions.length;
 
     return Scaffold(
+      backgroundColor: const Color(0xFFFFFFFF),
       body: SafeArea(
         child: isComplete ? _buildCompleteView() : _buildSurveyView(),
       ),
@@ -162,6 +242,12 @@ class _LifestyleSurveyPageState extends State<LifestyleSurveyPage> {
   }
 
   Widget _buildSurveyView() {
+    final List<String> titleParts = _currentQuestion.title.split('\n');
+    final String titleEmoji = titleParts.first.trim();
+    final String titleText = titleParts.length > 1
+        ? titleParts.sublist(1).join('\n').trim()
+        : _currentQuestion.title;
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
       child: Column(
@@ -171,25 +257,43 @@ class _LifestyleSurveyPageState extends State<LifestyleSurveyPage> {
             currentIndex: _currentIndex,
             totalCount: widget.questions.length,
             onBack: _goToPreviousQuestion,
+            showBackButton: !_currentQuestion.requiresTimeInput,
           ),
           const SizedBox(height: 28),
+          Text(
+            titleEmoji,
+            style: const TextStyle(fontSize: 38, height: 1),
+          ),
+          const SizedBox(height: 6),
           SizedBox(
             width: double.infinity,
-            child: FittedBox(
-              fit: BoxFit.scaleDown,
-              alignment: Alignment.centerLeft,
-              child: Text(
-                _currentQuestion.title,
-                maxLines: 1,
-                style: const TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.w700,
-                  color: Color(0xFF17171B),
-                ),
+            child: Text(
+              titleText,
+              style: const TextStyle(
+                fontFamily: 'Pretendard Variable',
+                fontSize: 22,
+                fontWeight: FontWeight.w500,
+                height: 1.45,
+                letterSpacing: -1,
+                color: Color(0xFF17171B),
               ),
             ),
           ),
           const SizedBox(height: 16),
+          if (_currentIndex == 1) ...<Widget>[
+            const Text(
+              '설문 결과는 언제든지 수정할 수 있어요!',
+              style: TextStyle(
+                fontFamily: 'Pretendard Variable',
+                fontSize: 16,
+                fontWeight: FontWeight.w400,
+                height: 1.5,
+                letterSpacing: 0,
+                color: Color(0xFF717182),
+              ),
+            ),
+            const SizedBox(height: 16),
+          ],
           Expanded(
             child: _currentQuestion.requiresTimeInput
                 ? _buildSleepTimeInput()
@@ -205,64 +309,590 @@ class _LifestyleSurveyPageState extends State<LifestyleSurveyPage> {
                     separatorBuilder: (BuildContext context, int index) => const SizedBox(height: 10),
                   ),
           ),
+          if (_currentQuestion.requiresTimeInput) ...<Widget>[
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              height: 56,
+              child: FilledButton(
+                style: FilledButton.styleFrom(
+                  backgroundColor: _canGoNext() ? const Color(0xFF6C5CE7) : const Color(0xFFCFCFE6),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                ),
+                onPressed: _canGoNext() ? _onNextPressed : null,
+                child: const Text(
+                  '다음',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+                ),
+              ),
+            ),
+          ],
         ],
       ),
     );
   }
 
   Widget _buildSleepTimeInput() {
+    return SingleChildScrollView(
+      child: Column(
+        children: <Widget>[
+          _SleepTimeValueCard(
+            title: '취침 시간',
+            isActive: _isEditingBedTime,
+            initialTime: _bedTime ?? const TimeOfDay(hour: 23, minute: 0),
+            onTap: () {
+              setState(() {
+                _isEditingBedTime = true;
+              });
+            },
+            onTimeChanged: (TimeOfDay time) => _setManualTime(isBedTime: true, time: time),
+          ),
+          const SizedBox(height: 8),
+          _SleepTimeValueCard(
+            title: '기상 시간',
+            isActive: !_isEditingBedTime,
+            initialTime: _wakeTime ?? const TimeOfDay(hour: 7, minute: 0),
+            onTap: () {
+              setState(() {
+                _isEditingBedTime = false;
+              });
+            },
+            onTimeChanged: (TimeOfDay time) => _setManualTime(isBedTime: false, time: time),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCompleteView() {
+    final int selectedCount = _recommendedRules.where((rule) => rule.isSelected).length;
+
     return Column(
       children: <Widget>[
-        SimpleTimeSelectCard(
-          title: '취침 시간',
-          selectedHour: _bedTime == null ? null : _displayHour(_bedTime!),
-          selectedPeriod: _bedTime == null ? null : _periodLabel(_bedTime!),
-          periods: _periods,
-          selectedMinute: _bedTime?.minute,
-          hours: _hours,
-          minutes: _minutes,
-          onPeriodChanged: _updateBedPeriod,
-          onHourChanged: _updateBedHour,
-          onMinuteChanged: _updateBedMinute,
+        Expanded(
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(20, 24, 20, 12),
+            children: <Widget>[
+              const Text(
+                '방 규칙 정하기',
+                style: TextStyle(
+                  fontFamily: 'Pretendard Variable',
+                  fontSize: 24,
+                  fontWeight: FontWeight.w500,
+                  height: 1.5,
+                  letterSpacing: 0,
+                  color: Color(0xFF0A0A0A),
+                ),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                '설문 결과를 바탕으로 추천된 규칙이에요.',
+                style: TextStyle(
+                  fontFamily: 'Pretendard Variable',
+                  fontSize: 16,
+                  fontWeight: FontWeight.w400,
+                  height: 1.5,
+                  letterSpacing: 0,
+                  color: Color(0xFF717182),
+                ),
+              ),
+              const SizedBox(height: 2),
+              const Text(
+                '채택할 규칙을 선택하고, 필요하면 수정하세요.',
+                style: TextStyle(
+                  fontFamily: 'Pretendard Variable',
+                  fontSize: 14,
+                  fontWeight: FontWeight.w400,
+                  height: 1.457,
+                  letterSpacing: 0,
+                  color: Color(0xFF717182),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Padding(
+                padding: const EdgeInsets.only(left: 4),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: const Color(0x1A6C5CE7),
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    child: Text(
+                      '$selectedCount개 채택됨',
+                      style: const TextStyle(
+                        color: Color(0xFF6C5CE7),
+                        fontFamily: 'Pretendard Variable',
+                        fontWeight: FontWeight.w400,
+                        fontSize: 13,
+                        height: 1,
+                        letterSpacing: 0,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 14),
+              ...List<Widget>.generate(_recommendedRules.length, (int index) {
+                final _RecommendedRule rule = _recommendedRules[index];
+                final bool isEditing = _editingRuleIndex == index;
+                final Color borderColor =
+                    rule.isSelected ? const Color(0xFF6C5CE7) : const Color(0xFFE2E2E9);
+
+                if (isEditing) {
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: Container(
+                      padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF8F8FC),
+                        borderRadius: BorderRadius.circular(18),
+                        border: Border.all(color: const Color(0xFF6C5CE7), width: 2),
+                      ),
+                      child: Column(
+                        children: <Widget>[
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(color: const Color(0xFFCFCDF8)),
+                            ),
+                            child: TextField(
+                              controller: TextEditingController(text: _editingRuleDraft)
+                                ..selection = TextSelection.fromPosition(
+                                  TextPosition(offset: _editingRuleDraft.length),
+                                ),
+                              minLines: 2,
+                              maxLines: 4,
+                              onChanged: (String value) {
+                                _editingRuleDraft = value;
+                              },
+                              decoration: const InputDecoration(
+                                border: InputBorder.none,
+                                isDense: true,
+                                contentPadding: EdgeInsets.zero,
+                              ),
+                              style: const TextStyle(
+                                fontFamily: 'Pretendard Variable',
+                                fontWeight: FontWeight.w400,
+                                fontSize: 14.4,
+                                height: 1.5,
+                                letterSpacing: 0,
+                                color: Color(0xFF1E1D24),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.end,
+                            children: <Widget>[
+                              InkWell(
+                                borderRadius: BorderRadius.circular(14),
+                                onTap: _cancelEditRule,
+                                child: Container(
+                                  width: 54,
+                                  height: 40,
+                                  decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.circular(14),
+                                    color: const Color(0xFFEFF0F3),
+                                  ),
+                                  child: const Icon(
+                                    Icons.close_rounded,
+                                    color: Color(0xFF7B8090),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              InkWell(
+                                borderRadius: BorderRadius.circular(14),
+                                onTap: _confirmEditRule,
+                                child: Container(
+                                  width: 60,
+                                  height: 40,
+                                  decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.circular(14),
+                                    color: const Color(0xFF6C5CE7),
+                                  ),
+                                  child: const Icon(
+                                    Icons.check_rounded,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                }
+
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: InkWell(
+                    onTap: () => _toggleRule(index),
+                    borderRadius: BorderRadius.circular(16),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF5F5F7),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: borderColor),
+                      ),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: <Widget>[
+                          GestureDetector(
+                            onTap: () => _toggleRule(index),
+                            child: Container(
+                              margin: const EdgeInsets.only(top: 2),
+                              width: 22,
+                              height: 22,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                border: Border.all(color: borderColor),
+                                color: rule.isSelected
+                                    ? const Color(0xFF6C5CE7)
+                                    : Colors.transparent,
+                              ),
+                              child: rule.isSelected
+                                  ? const Icon(Icons.check, size: 14, color: Colors.white)
+                                  : null,
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              rule.text,
+                              style: const TextStyle(
+                                fontFamily: 'Pretendard Variable',
+                                fontWeight: FontWeight.w400,
+                                fontSize: 14.4,
+                                height: 1.5,
+                                letterSpacing: 0,
+                                color: Color(0xFF1E1D24),
+                              ),
+                            ),
+                          ),
+                          IconButton(
+                            onPressed: () => _startEditRule(index),
+                            visualDensity: VisualDensity.compact,
+                            icon: Image.asset(
+                              'assets/images/pen.png',
+                              width: 18,
+                              height: 18,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+              }),
+            ],
+          ),
         ),
-        const SizedBox(height: 10),
-        SimpleTimeSelectCard(
-          title: '기상 시간',
-          selectedHour: _wakeTime == null ? null : _displayHour(_wakeTime!),
-          selectedPeriod: _wakeTime == null ? null : _periodLabel(_wakeTime!),
-          periods: _periods,
-          selectedMinute: _wakeTime?.minute,
-          hours: _hours,
-          minutes: _minutes,
-          onPeriodChanged: _updateWakePeriod,
-          onHourChanged: _updateWakeHour,
-          onMinuteChanged: _updateWakeMinute,
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 6, 20, 20.32),
+          child: Center(
+            child: Container(
+              width: 354,
+              height: 56,
+              decoration: BoxDecoration(
+                color: const Color(0xFF6C5CE7),
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: const <BoxShadow>[
+                  BoxShadow(
+                    color: Color(0x406C5CE7),
+                    offset: Offset(0, 4),
+                    blurRadius: 6,
+                    spreadRadius: -4,
+                  ),
+                  BoxShadow(
+                    color: Color(0x406C5CE7),
+                    offset: Offset(0, 10),
+                    blurRadius: 15,
+                    spreadRadius: -3,
+                  ),
+                ],
+              ),
+              child: FilledButton(
+                style: FilledButton.styleFrom(
+                  backgroundColor: Colors.transparent,
+                  shadowColor: Colors.transparent,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                ),
+                onPressed: () {
+                  Navigator.of(context).pushReplacementNamed('/home');
+                },
+                child: const Text(
+                  '저장하기',
+                  style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
+                ),
+              ),
+            ),
+          ),
         ),
       ],
     );
   }
 
-  Widget _buildCompleteView() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24),
-      child: Center(
+}
+
+class _RecommendedRule {
+  const _RecommendedRule({
+    required this.text,
+    required this.isSelected,
+  });
+
+  final String text;
+  final bool isSelected;
+
+  _RecommendedRule copyWith({
+    String? text,
+    bool? isSelected,
+  }) {
+    return _RecommendedRule(
+      text: text ?? this.text,
+      isSelected: isSelected ?? this.isSelected,
+    );
+  }
+}
+
+class _SleepTimeValueCard extends StatelessWidget {
+  const _SleepTimeValueCard({
+    required this.title,
+    required this.isActive,
+    required this.initialTime,
+    required this.onTap,
+    required this.onTimeChanged,
+  });
+
+  final String title;
+  final bool isActive;
+  final TimeOfDay initialTime;
+  final VoidCallback onTap;
+  final ValueChanged<TimeOfDay> onTimeChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: () {
+        onTap();
+      },
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: isActive ? const Color(0xFF6C5CE7) : const Color(0xFFE2E2E9),
+          ),
+          color: const Color(0xFFF9F9FC),
+        ),
         child: Column(
-          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
-            const Icon(Icons.check_circle_rounded, color: Color(0xFF6E63F7), size: 66),
-            const SizedBox(height: 16),
-            const Text(
-              '설문이 완료되었어요',
-              style: TextStyle(fontSize: 24, fontWeight: FontWeight.w700),
-            ),
-            const SizedBox(height: 8),
             Text(
-              '총 ${_answers.length}개 응답 저장',
-              style: const TextStyle(fontSize: 16, color: Color(0xFF666670)),
+              title,
+              style: const TextStyle(
+                fontSize: 14,
+                color: Color(0xFF717182),
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFFE2E2E9)),
+              ),
+              child: _InlineTimeEditor(
+                key: ValueKey<String>(title),
+                time: initialTime,
+                onChanged: onTimeChanged,
+              ),
             ),
           ],
         ),
       ),
+    );
+  }
+}
+
+class _InlineTimeEditor extends StatefulWidget {
+  const _InlineTimeEditor({
+    super.key,
+    required this.time,
+    required this.onChanged,
+  });
+
+  final TimeOfDay time;
+  final ValueChanged<TimeOfDay> onChanged;
+
+  @override
+  State<_InlineTimeEditor> createState() => _InlineTimeEditorState();
+}
+
+class _InlineTimeEditorState extends State<_InlineTimeEditor> {
+  late final TextEditingController _hourController;
+  late final TextEditingController _minuteController;
+  late String _period;
+
+  @override
+  void initState() {
+    super.initState();
+    _hourController = TextEditingController();
+    _minuteController = TextEditingController();
+    _syncFromTime(widget.time);
+  }
+
+  @override
+  void didUpdateWidget(covariant _InlineTimeEditor oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.time != widget.time) {
+      _syncFromTime(widget.time);
+    }
+  }
+
+  @override
+  void dispose() {
+    _hourController.dispose();
+    _minuteController.dispose();
+    super.dispose();
+  }
+
+  int _displayHour(TimeOfDay time) {
+    final int hour = time.hour % 12;
+    return hour == 0 ? 12 : hour;
+  }
+
+  String _periodLabel(TimeOfDay time) {
+    return time.hour < 12 ? '오전' : '오후';
+  }
+
+  int _to24Hour({required int displayHour, required String period}) {
+    final int normalizedHour = displayHour % 12;
+    return period == '오전' ? normalizedHour : normalizedHour + 12;
+  }
+
+  void _syncFromTime(TimeOfDay time) {
+    _period = _periodLabel(time);
+    _hourController.text = _displayHour(time).toString();
+    _minuteController.text = time.minute.toString().padLeft(2, '0');
+  }
+
+  void _emitIfValid() {
+    final int? hour = int.tryParse(_hourController.text);
+    final int? minute = int.tryParse(_minuteController.text);
+    if (hour == null || minute == null) {
+      return;
+    }
+    if (hour < 1 || hour > 12 || minute < 0 || minute > 59) {
+      return;
+    }
+    widget.onChanged(
+      TimeOfDay(hour: _to24Hour(displayHour: hour, period: _period), minute: minute),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: <Widget>[
+        DropdownButtonHideUnderline(
+          child: DropdownButton<String>(
+            value: _period,
+            icon: const Icon(Icons.expand_more_rounded, size: 18),
+            style: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w500,
+              color: Color(0xFF2A2A30),
+            ),
+            items: const <String>['오전', '오후']
+                .map(
+                  (String p) => DropdownMenuItem<String>(
+                    value: p,
+                    child: Text(p),
+                  ),
+                )
+                .toList(),
+            onChanged: (String? value) {
+              if (value == null) {
+                return;
+              }
+              setState(() {
+                _period = value;
+              });
+              _emitIfValid();
+            },
+          ),
+        ),
+        const SizedBox(width: 6),
+        SizedBox(
+          width: 36,
+          child: TextField(
+            controller: _hourController,
+            keyboardType: TextInputType.number,
+            textAlign: TextAlign.center,
+            inputFormatters: <TextInputFormatter>[
+              FilteringTextInputFormatter.digitsOnly,
+              LengthLimitingTextInputFormatter(2),
+            ],
+            style: const TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w500,
+              color: Color(0xFF2A2A30),
+            ),
+            decoration: const InputDecoration(
+              isDense: true,
+              border: InputBorder.none,
+              contentPadding: EdgeInsets.zero,
+            ),
+            onChanged: (_) => _emitIfValid(),
+          ),
+        ),
+        const Text(
+          ':',
+          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w500, color: Color(0xFF2A2A30)),
+        ),
+        SizedBox(
+          width: 36,
+          child: TextField(
+            controller: _minuteController,
+            keyboardType: TextInputType.number,
+            textAlign: TextAlign.center,
+            inputFormatters: <TextInputFormatter>[
+              FilteringTextInputFormatter.digitsOnly,
+              LengthLimitingTextInputFormatter(2),
+            ],
+            style: const TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w500,
+              color: Color(0xFF2A2A30),
+            ),
+            decoration: const InputDecoration(
+              isDense: true,
+              border: InputBorder.none,
+              contentPadding: EdgeInsets.zero,
+            ),
+            onChanged: (_) => _emitIfValid(),
+          ),
+        ),
+      ],
     );
   }
 }
