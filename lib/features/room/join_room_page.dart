@@ -43,7 +43,7 @@ class _JoinRoomPageState extends State<JoinRoomPage> {
                 width: double.infinity,
                 child: ElevatedButton(
                   onPressed: () {
-                    Navigator.pushNamed(context, '/home');
+                    Navigator.pushReplacementNamed(context, '/survey');
                   }, 
                   child: Text('참여하기', style: TextStyle(fontSize: 16,))
                 ),
