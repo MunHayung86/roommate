@@ -66,6 +66,18 @@ flutter:
   assets:
     - assets/fonts/
     - assets/images/
+
+  fonts:
+    - family: Pretendard
+      fonts:
+        - asset: assets/fonts/Pretendard-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/Pretendard-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/Pretendard-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/Pretendard-Bold.ttf
+          weight: 700
   #   - images/a_dot_ham.jpeg
 
   # An image asset can refer to one or more resolution-specific "variants", see
