@@ -4,6 +4,7 @@ import 'package:roommate/features/auth/login_page.dart';
 import 'package:roommate/features/navigation.dart';
 import 'package:roommate/features/room/create_room_page.dart';
 import 'package:roommate/features/room/join_room_page.dart';
+import 'package:roommate/features/room/room_page.dart';
 import 'package:roommate/features/room/room_select_page.dart';
 import 'package:roommate/features/room/share_room_code_page.dart';
 import 'package:roommate/features/survey/survey_page.dart';
@@ -36,6 +37,8 @@ class MyApp extends StatelessWidget {
         '/create_room': (context) => const CreateRoomPage(),
         '/join_room': (context) => const JoinRoomPage(),
         '/survey': (context) => const SurveyPage(),
+        '/room': (context) => const RoomPage(),
+        
       },
       onGenerateRoute: (settings) {
         if (settings.name == '/share_room_code') {
