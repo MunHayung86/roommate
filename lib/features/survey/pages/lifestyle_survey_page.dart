@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../survey_service.dart';
 import '../models/survey_question.dart';
 import '../widgets/survey_option_button.dart';
 import '../widgets/survey_progress_header.dart';
@@ -20,12 +21,14 @@ class LifestyleSurveyPage extends StatefulWidget {
 }
 
 class _LifestyleSurveyPageState extends State<LifestyleSurveyPage> {
+  final SurveyService _surveyService = SurveyService();
   int _currentIndex = 0;
   final Map<String, String> _answers = <String, String>{};
   List<_RecommendedRule> _recommendedRules = <_RecommendedRule>[];
   int? _editingRuleIndex;
   String _editingRuleDraft = '';
   bool _isEditingBedTime = true;
+  bool _isSaving = false;
   TimeOfDay? _bedTime = const TimeOfDay(hour: 23, minute: 0);
   TimeOfDay? _wakeTime = const TimeOfDay(hour: 7, minute: 0);
 
@@ -227,6 +230,55 @@ class _LifestyleSurveyPageState extends State<LifestyleSurveyPage> {
       _editingRuleIndex = null;
       _editingRuleDraft = '';
     });
+  }
+
+  Future<void> _saveSurveyResult() async {
+    if (_isSaving) {
+      return;
+    }
+
+    final List<String> selectedRules = _recommendedRules
+        .where((rule) => rule.isSelected)
+        .map((rule) => rule.text.trim())
+        .where((text) => text.isNotEmpty)
+        .toList();
+
+    if (selectedRules.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('최소 1개 이상의 규칙을 선택해 주세요.')),
+      );
+      return;
+    }
+
+    setState(() {
+      _isSaving = true;
+    });
+
+    try {
+      await _surveyService.saveSurveyAndRules(
+        answers: Map<String, String>.from(_answers),
+        selectedRules: selectedRules,
+      );
+
+      if (!mounted) {
+        return;
+      }
+
+      Navigator.of(context).pushReplacementNamed('/home');
+    } catch (e) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('설문 저장에 실패했어요. 잠시 후 다시 시도해 주세요.')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSaving = false;
+        });
+      }
+    }
   }
 
   @override
@@ -630,13 +682,20 @@ class _LifestyleSurveyPageState extends State<LifestyleSurveyPage> {
                     borderRadius: BorderRadius.circular(16),
                   ),
                 ),
-                onPressed: () {
-                  Navigator.of(context).pushReplacementNamed('/home');
-                },
-                child: const Text(
-                  '저장하기',
-                  style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
-                ),
+                onPressed: _isSaving ? null : _saveSurveyResult,
+                child: _isSaving
+                    ? const SizedBox(
+                        width: 22,
+                        height: 22,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2.3,
+                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                        ),
+                      )
+                    : const Text(
+                        '저장하기',
+                        style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
+                      ),
               ),
             ),
           ),
