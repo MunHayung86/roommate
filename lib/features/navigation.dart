@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:roommate/features/activity/activity_log_page.dart';
 import 'package:roommate/features/auth/my_page.dart';
 import 'package:roommate/features/room/home_page.dart';
+import 'package:roommate/features/room/room_page.dart';
 import 'package:roommate/features/wakeup/wakeup_page.dart';
 
 class Navigation extends StatefulWidget {
@@ -33,15 +35,11 @@ class _NavigationState extends State<Navigation> {
         break;
 
       case 1: // 룸
-        page = const Scaffold(
-          body: Center(child: Text("준비중")),
-        );
+        page = const RoomPage();
         break;
 
       case 2: // 활동 기록
-        page = const Scaffold(
-          body: Center(child: Text("준비중")),
-        );
+        page = const ActivityLogPage();
         break;
 
       case 3: // 깨워줘
