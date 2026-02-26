@@ -333,8 +333,7 @@ class _HomePageState extends State<HomePage> {
                     ..addAll(loadedNotes);
                 }
                 final String roomName = (data?['name'] as String?) ?? '나의 방';
-                final String roomTitle =
-                    roomName.endsWith('호') ? roomName : '$roomName호';
+                final String roomTitle = roomName;
                 final String motto =
                     (data?['motto'] as String?) ?? '방 훈을 설정해 보세요.';
 

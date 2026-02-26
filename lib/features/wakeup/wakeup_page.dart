@@ -17,15 +17,15 @@ class _WakeupPageState extends State<WakeupPage> {
   int _selectedMinute = 0;
   bool _isOn = false; // alarm OFF by default per design
 
-  final FixedExtentScrollController _hourController = FixedExtentScrollController(initialItem: 7); // 8시 -> index 7
+  final FixedExtentScrollController _hourController = FixedExtentScrollController(initialItem: 7);
   final FixedExtentScrollController _minuteController = FixedExtentScrollController(initialItem: 0);
-  final FixedExtentScrollController _ampmController = FixedExtentScrollController(initialItem: 0); // 오전
+  final FixedExtentScrollController _ampmController = FixedExtentScrollController(initialItem: 0);
 
   int get _hour12 => _selectedHour24 == 0 ? 12 : _selectedHour24 > 12 ? _selectedHour24 - 12 : _selectedHour24;
   int get _selectedHourIndex => _hour12 - 1;
   int get _selectedAmpmIndex => _selectedHour24 < 12 ? 0 : 1;
 
-  /// 룸메이트 기상 현황. 나중에 Firestore(방 멤버 + 기상 설정)에서 불러와 대체
+  /// 룸메이트 기상 현황 (목업)
   List<RoommateWakeupItem> get _roommateWakeupList => [
         const RoommateWakeupItem(
           id: '1',

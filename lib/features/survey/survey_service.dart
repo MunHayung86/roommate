@@ -35,6 +35,18 @@ class SurveyService {
     final DocumentReference<Map<String, dynamic>> roomSurveyRef =
         roomRef.collection('surveys').doc(user.uid);
 
+    // 기존 방 규칙과 이번에 선택한 규칙을 합쳐 하나의 룸 규칙 세트로 만든다.
+    final DocumentSnapshot<Map<String, dynamic>> roomSnapshot =
+        await roomRef.get();
+    final List<dynamic> existingRulesDynamic =
+        (roomSnapshot.data()?['rules'] as List<dynamic>?) ?? <dynamic>[];
+    final List<String> existingRules =
+        existingRulesDynamic.map((dynamic e) => e.toString()).toList();
+    final List<String> mergedRules = <String>[
+      ...existingRules,
+      ...selectedRules,
+    ].toSet().toList();
+
     final WriteBatch batch = _firestore.batch();
 
     batch.set(
@@ -62,7 +74,7 @@ class SurveyService {
     batch.set(
       roomRef,
       <String, dynamic>{
-        'rules': selectedRules,
+        'rules': mergedRules,
         'rulesGenerated': true,
         'rulesUpdatedAt': FieldValue.serverTimestamp(),
         'surveyCompletedMemberIds': FieldValue.arrayUnion(<String>[user.uid]),

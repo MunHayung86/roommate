@@ -96,6 +96,14 @@ class RoomService {
     await batch.commit();
   }
 
+  /// 방 규칙 업데이트 (직접 규칙 생성/수정 시)
+  Future<void> updateRoomRules(String roomId, List<String> rules) async {
+    await _firestore.collection('rooms').doc(roomId).update(<String, dynamic>{
+      'rules': rules,
+      'rulesUpdatedAt': FieldValue.serverTimestamp(),
+    });
+  }
+
   /// 현재 사용자가 속한 방 정보 가져오기
   Future<DocumentSnapshot<Map<String, dynamic>>?> getCurrentUserRoom() async {
     final User? user = _auth.currentUser;
@@ -114,6 +122,94 @@ class RoomService {
     }
 
     return _firestore.collection('rooms').doc(roomId).get();
+  }
+
+  /// 방 멤버 목록 (uid, nickname, photoUrl [, wakeupTime, isAlarmOn])
+  Future<List<Map<String, dynamic>>> getRoomMembers(
+    String roomId, {
+    bool includeWakeup = false,
+  }) async {
+    final DocumentSnapshot<Map<String, dynamic>> roomDoc =
+        await _firestore.collection('rooms').doc(roomId).get();
+
+    if (!roomDoc.exists) return [];
+
+    final List<dynamic> memberIds =
+        (roomDoc.data()?['memberIds'] as List<dynamic>?) ?? [];
+
+    if (memberIds.isEmpty) return [];
+
+    final List<Map<String, dynamic>> members = [];
+    for (final id in memberIds) {
+      final String uid = id.toString();
+      final DocumentSnapshot<Map<String, dynamic>> userDoc =
+          await _firestore.collection('users').doc(uid).get();
+      if (!userDoc.exists) continue;
+      final data = userDoc.data()!;
+      final map = <String, dynamic>{
+        'uid': uid,
+        'nickname': data['nickname'] as String? ?? '알 수 없음',
+        'photoUrl': data['photoUrl'] as String?,
+      };
+      if (includeWakeup) {
+        map['wakeupTime'] = data['wakeupTime'] as String? ?? '--:--';
+        map['isAlarmOn'] = data['alarmOn'] as bool? ?? false;
+      }
+      members.add(map);
+    }
+    return members;
+  }
+
+  /// 특정 멤버의 설문 응답 (users/{uid}.surveyAnswers). 없으면 null.
+  Future<Map<String, String>?> getMemberSurveyAnswers(String uid) async {
+    final doc = await _firestore.collection('users').doc(uid).get();
+    final data = doc.data();
+    if (data == null) return null;
+    final raw = data['surveyAnswers'];
+    if (raw is! Map) return null;
+    final Map<String, String> result = {};
+    raw.forEach((k, v) {
+      if (k is String && v != null) result[k] = v.toString();
+    });
+    return result.isEmpty ? null : result;
+  }
+
+  /// 현재 유저 기상 시간·알람 설정 저장
+  Future<void> setMyWakeup({required String wakeupTime, required bool alarmOn}) async {
+    final User? user = _auth.currentUser;
+    if (user == null) throw Exception('로그인한 사용자 정보가 없습니다.');
+    await _firestore.collection('users').doc(user.uid).set(
+      <String, dynamic>{
+        'wakeupTime': wakeupTime,
+        'alarmOn': alarmOn,
+      },
+      SetOptions(merge: true),
+    );
+  }
+
+  /// 방 나가기 (현재 유저를 방에서 제거, users.roomId 제거)
+  Future<void> leaveRoom() async {
+    final User? user = _auth.currentUser;
+    if (user == null) throw Exception('로그인한 사용자 정보가 없습니다.');
+
+    final DocumentSnapshot<Map<String, dynamic>> userDoc =
+        await _firestore.collection('users').doc(user.uid).get();
+    final String? roomId = userDoc.data()?['roomId'] as String?;
+    if (roomId == null) throw Exception('참여 중인 방이 없습니다.');
+
+    final WriteBatch batch = _firestore.batch();
+
+    batch.update(
+      _firestore.collection('rooms').doc(roomId),
+      <String, dynamic>{'memberIds': FieldValue.arrayRemove(<String>[user.uid])},
+    );
+    batch.set(
+      _firestore.collection('users').doc(user.uid),
+      <String, dynamic>{'roomId': FieldValue.delete()},
+      SetOptions(merge: true),
+    );
+
+    await batch.commit();
   }
 
   Future<String> _generateUniqueInviteCode() async {

@@ -23,12 +23,12 @@ class ActivityLogPage extends StatelessWidget {
                       color: Color(0xff1E1D24),
                     ),
                   ),
-                  SizedBox(height: 35),
+                  const SizedBox(height: 35),
                   _DiligentCard(
                     title: '이번 주 가장 부지런한 룸메이트',
                     name: '김민수 🎉',
                   ),
-                  SizedBox(height: 31),
+                  const SizedBox(height: 31),
                   _ContributionCard(
                     rows: const [
                       _ContributionRowData(emoji: '😊', name: '김민수', count: 4, barColor: Color(0xff6C5CE7)),
@@ -37,7 +37,14 @@ class ActivityLogPage extends StatelessWidget {
                     ],
                   ),
                   const SizedBox(height: 32),
-                  Text('📋 완료 기록', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: Color(0xff717182)),),
+                  const Text(
+                    '📋 완료 기록',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                      color: Color(0xff717182),
+                    ),
+                  ),
                   const SizedBox(height: 19),
                 ],
               ),
@@ -47,7 +54,6 @@ class ActivityLogPage extends StatelessWidget {
           const SliverToBoxAdapter(child: SizedBox(height: 24)),
         ],
       ),
-      
     );
   }
 }
