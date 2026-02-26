@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:roommate/features/room/room_service.dart';
 import 'package:roommate/features/room/roommate_lifestyle_detail_page.dart';
 
 class RoomPage extends StatefulWidget {
@@ -9,158 +10,280 @@ class RoomPage extends StatefulWidget {
 }
 
 class _RoomPageState extends State<RoomPage> {
-  static const int _cardSize = 232;
-  static const int _roommateCount = 3;
+  static const double _cardWidth = 232;
 
-  late PageController _carouselController;
+  final RoomService _roomService = RoomService();
+  Future<void>? _loadFuture;
+  List<Map<String, dynamic>> _members = [];
+  List<dynamic> _rules = [];
 
   @override
   void initState() {
     super.initState();
-    _carouselController = PageController(
-      viewportFraction: 0.65,
-      initialPage: 5000,
-    );
+    _loadFuture = _loadRoomAndMembers();
   }
 
-  @override
-  void dispose() {
-    _carouselController.dispose();
-    super.dispose();
+  Future<void> _loadRoomAndMembers() async {
+    final roomSnap = await _roomService.getCurrentUserRoom();
+    if (!mounted) return;
+    if (roomSnap == null || !roomSnap.exists) {
+      setState(() {
+        _members = [];
+        _rules = [];
+      });
+      return;
+    }
+    final data = roomSnap.data()!;
+    _rules = (data['rules'] as List<dynamic>?) ?? [];
+    final members = await _roomService.getRoomMembers(roomSnap.id);
+    if (!mounted) return;
+    setState(() {
+      _members = members;
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xffFBFBFE),
-      body: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 24),
+      body: FutureBuilder<void>(
+        future: _loadFuture,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          return Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const SizedBox(height: 85),
+                const Text(
+                  '룸메이트',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w500,
+                    color: Color(0xff1E1D24),
+                  ),
+                ),
+                Expanded(
+                  child: SingleChildScrollView(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const SizedBox(height: 57),
+                        SizedBox(
+                          height: 232,
+                          child: LayoutBuilder(
+                            builder: (context, constraints) {
+                              final screenWidth = constraints.maxWidth;
+                              final viewportFraction = _cardWidth / screenWidth;
+                              final count = _members.isEmpty ? 1 : _members.length;
+                              return PageView.builder(
+                                controller: PageController(viewportFraction: viewportFraction),
+                                padEnds: false,
+                                itemCount: count,
+                                itemBuilder: (context, index) {
+                                  if (_members.isEmpty) {
+                                    return Center(
+                                      child: Text(
+                                        '방에 참여한 룸메이트가 없어요',
+                                        style: const TextStyle(
+                                          fontSize: 16,
+                                          color: Color(0xff717182),
+                                        ),
+                                        textAlign: TextAlign.center,
+                                      ),
+                                    );
+                                  }
+                                  final m = _members[index];
+                                  final name = m['nickname'] as String? ?? '알 수 없음';
+                                  final photoUrl = m['photoUrl'] as String?;
+                                  final uid = m['uid'] as String?;
+                                  return Center(
+                                    child: Padding(
+                                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                                      child: SizedBox(
+                                        width: _cardWidth,
+                                        height: 232,
+                                        child: _RoommateCard(
+                                          name: name,
+                                          photoUrl: photoUrl,
+                                          status: null,
+                                          onTap: () {
+                                            showLifestyleBottomSheet(
+                                              context,
+                                              name: name,
+                                              memberUid: uid,
+                                              photoUrl: photoUrl,
+                                            );
+                                          },
+                                        ),
+                                      ),
+                                    ),
+                                  );
+                                },
+                              );
+                            },
+                          ),
+                        ),
+                        const SizedBox(height: 57),
+                        _buildRulesSection(),
+                        const SizedBox(height: 40),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildRulesSection() {
+    if (_rules.isEmpty) {
+      return Center(
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const SizedBox(height: 85),
+            const Text('😵', style: TextStyle(fontSize: 23)),
+            const SizedBox(height: 8),
             const Text(
-              '룸메이트',
+              '아직 방 규칙이 없어요',
               style: TextStyle(
-                fontSize: 20,
+                fontSize: 16,
+                color: Color(0xff717182),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: () {
+                  Navigator.of(context, rootNavigator: true)
+                      .pushNamed('/survey', arguments: true)
+                      .then((_) => _loadRoomAndMembers());
+                },
+                borderRadius: BorderRadius.circular(16),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 114, vertical: 16),
+                  decoration: BoxDecoration(
+                    color: const Color(0xff6C5CE7),
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Color.fromRGBO(108, 92, 231, 0.25),
+                        blurRadius: 6,
+                        spreadRadius: -4,
+                        offset: const Offset(0, 4),
+                      ),
+                      BoxShadow(
+                        color: Color.fromRGBO(108, 92, 231, 0.25),
+                        blurRadius: 8,
+                        spreadRadius: -1,
+                        offset: const Offset(0, 5),
+                      ),
+                    ],
+                  ),
+                  child: const Text(
+                    '방 규칙 만들기',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            const Text('📋', style: TextStyle(fontSize: 18)),
+            const SizedBox(width: 6),
+            const Text(
+              '방 규칙',
+              style: TextStyle(
+                fontSize: 18,
                 fontWeight: FontWeight.w500,
                 color: Color(0xff1E1D24),
               ),
             ),
-            Expanded(
-              child: LayoutBuilder(
-                builder: (context, constraints) {
-                  final screenWidth = constraints.maxWidth;
-                  final cardWidth = 232.0;
-
-                  final viewportFraction = cardWidth / screenWidth;
-
-                  return PageView.builder(
-                    controller: PageController(
-                      viewportFraction: viewportFraction,
-                    ),
-                    padEnds: false,
-                    itemCount: _roommateCount,
-                    itemBuilder: (context, index) {
-                      final name =
-                          index == 0 ? '이서연' : '룸메이트 ${index + 1}';
-                      final status =
-                          index == 0 ? '외출중' : null;
-
-                      return Center(
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 8),
-                          child: SizedBox(
-                            width: cardWidth,
-                            height: 232,
-                            child: _RoommateCard(
-                              name: name,
-                              status: status,
-                              onTap: () {
-                                showLifestyleBottomSheet(context, name: name);
-                              },
-                            ),
-                          ),
-                        ),
-                      );
-                    },
-                  );
-                },
+            const SizedBox(width: 4),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              decoration: BoxDecoration(
+                color: const Color(0xffECEAFC),
+                borderRadius: BorderRadius.circular(999),
+              ),
+              child: Text(
+                '${_rules.length}개',
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                  color: Color(0xff6C5CE7),
+                ),
               ),
             ),
-              const Text(
-                '📋 방 규칙',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w500,
-                  color: Color(0xff1E1D24),
-                ),
+            const Spacer(),
+            const Text(
+              '규칙 수정하기',
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+                color: Color.fromRGBO(113, 113, 130, 0.5),
               ),
-              const SizedBox(height: 92),
-              Center(
-                child: Column(
-                  children: [
-                    const Text('😵', style: TextStyle(fontSize: 23)),
-                    const SizedBox(height: 8),
-                    const Text(
-                      '아직 방 규칙이 없어요',
-                      style: TextStyle(
-                        fontSize: 16,
-                        color: Color(0xff717182),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Material(
-                      color: Colors.transparent,
-                      child: InkWell(
-                        onTap: () {
-                          Navigator.of(context, rootNavigator: true).pushNamed(
-                            '/survey',
-                            arguments: true,
-                          );
-                        },
-                        borderRadius: BorderRadius.circular(16),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 114,
-                            vertical: 16,
-                          ),
-                          decoration: BoxDecoration(
-                            color: const Color(0xff6C5CE7),
-                            borderRadius: BorderRadius.circular(16),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Color.fromRGBO(108, 92, 231, 0.25),
-                                blurRadius: 6,
-                                spreadRadius: -4,
-                                offset: const Offset(0, 4),
-                              ),
-                              BoxShadow(
-                                color: Color.fromRGBO(108, 92, 231, 0.25),
-                                blurRadius: 8,
-                                spreadRadius: -1,
-                                offset: const Offset(0, 5),
-                              ),
-                            ],
-                          ),
-                          child: const Text(
-                            '방 규칙 만들기',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.white,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            const SizedBox(height: 40),
+            ),
           ],
         ),
-      ),
+        const SizedBox(height: 16),
+        ...List.generate(_rules.length, (index) {
+          final rule = _rules[index].toString();
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: const Color.fromRGBO(0, 0, 0, 0.1), width: 0.65),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '${index + 1}.',
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                      color: Color(0xff6C5CE7),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      rule,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        color: Color(0xff1E1D24),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }),
+      ],
     );
   }
 }
@@ -169,10 +292,12 @@ class _RoommateCard extends StatelessWidget {
   const _RoommateCard({
     required this.name,
     required this.onTap,
+    this.photoUrl,
     this.status,
   });
 
   final String name;
+  final String? photoUrl;
   final String? status;
   final VoidCallback onTap;
 
@@ -231,11 +356,20 @@ class _RoommateCard extends StatelessWidget {
                         end: Alignment.bottomRight,
                       ),
                     ),
-                    child: const Center(
-                      child: Text(
-                        '😊',
-                        style: TextStyle(fontSize: 48),
-                      ),
+                    child: ClipOval(
+                      child: photoUrl != null && photoUrl!.isNotEmpty
+                          ? Image.network(
+                              photoUrl!,
+                              width: 96,
+                              height: 96,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) => const Center(
+                                child: Text('😊', style: TextStyle(fontSize: 48)),
+                              ),
+                            )
+                          : const Center(
+                              child: Text('😊', style: TextStyle(fontSize: 48)),
+                            ),
                     ),
                   ),
                   if (status != null) ...[
