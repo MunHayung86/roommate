@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../survey_service.dart';
 import '../models/survey_question.dart';
@@ -28,6 +29,8 @@ class _LifestyleSurveyPageState extends State<LifestyleSurveyPage> {
   int? _editingRuleIndex;
   String _editingRuleDraft = '';
   bool _isEditingBedTime = true;
+  bool _isSubmittingSurvey = false;
+  bool _isWaitingForMembers = false;
   bool _isSaving = false;
   TimeOfDay? _bedTime = const TimeOfDay(hour: 23, minute: 0);
   TimeOfDay? _wakeTime = const TimeOfDay(hour: 7, minute: 0);
@@ -79,7 +82,7 @@ class _LifestyleSurveyPageState extends State<LifestyleSurveyPage> {
       return;
     }
 
-    _goToNextQuestion();
+    await _goToNextQuestion();
   }
 
   void _goToPreviousQuestion() {
@@ -92,13 +95,9 @@ class _LifestyleSurveyPageState extends State<LifestyleSurveyPage> {
     });
   }
 
-  void _goToNextQuestion() {
+  Future<void> _goToNextQuestion() async {
     if (_currentIndex >= widget.questions.length - 1) {
-      widget.onCompleted?.call(Map<String, String>.from(_answers));
-      setState(() {
-        _currentIndex = widget.questions.length;
-        _recommendedRules = _generateRecommendedRules(_answers);
-      });
+      await _completeSurvey();
       return;
     }
 
@@ -114,12 +113,12 @@ class _LifestyleSurveyPageState extends State<LifestyleSurveyPage> {
     return _answers.containsKey(_currentQuestion.id);
   }
 
-  void _onNextPressed() {
+  Future<void> _onNextPressed() async {
     if (!_canGoNext()) {
       return;
     }
     _syncSleepAnswer();
-    _goToNextQuestion();
+    await _goToNextQuestion();
   }
 
   String _formatTime(TimeOfDay time) {
@@ -232,6 +231,48 @@ class _LifestyleSurveyPageState extends State<LifestyleSurveyPage> {
     });
   }
 
+  Future<void> _completeSurvey() async {
+    if (_isSubmittingSurvey) {
+      return;
+    }
+
+    final Map<String, String> finalAnswers = Map<String, String>.from(_answers);
+    final List<_RecommendedRule> generatedRules = _generateRecommendedRules(finalAnswers);
+
+    setState(() {
+      _isSubmittingSurvey = true;
+    });
+
+    try {
+      await _surveyService.saveSurveyAnswers(answers: finalAnswers);
+      final bool isAllCompleted = await _surveyService.areAllMembersSurveyCompleted();
+
+      if (!mounted) {
+        return;
+      }
+
+      widget.onCompleted?.call(finalAnswers);
+      setState(() {
+        _currentIndex = widget.questions.length;
+        _recommendedRules = generatedRules;
+        _isWaitingForMembers = !isAllCompleted;
+      });
+    } catch (e) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('설문 저장에 실패했어요. 잠시 후 다시 시도해 주세요.')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSubmittingSurvey = false;
+        });
+      }
+    }
+  }
+
   Future<void> _saveSurveyResult() async {
     if (_isSaving) {
       return;
@@ -255,10 +296,7 @@ class _LifestyleSurveyPageState extends State<LifestyleSurveyPage> {
     });
 
     try {
-      await _surveyService.saveSurveyAndRules(
-        answers: Map<String, String>.from(_answers),
-        selectedRules: selectedRules,
-      );
+      await _surveyService.saveSelectedRules(selectedRules: selectedRules);
 
       if (!mounted) {
         return;
@@ -284,11 +322,16 @@ class _LifestyleSurveyPageState extends State<LifestyleSurveyPage> {
   @override
   Widget build(BuildContext context) {
     final bool isComplete = _currentIndex >= widget.questions.length;
+    final bool showWaiting = isComplete && _isWaitingForMembers;
 
     return Scaffold(
       backgroundColor: const Color(0xFFFFFFFF),
       body: SafeArea(
-        child: isComplete ? _buildCompleteView() : _buildSurveyView(),
+        child: showWaiting
+            ? _buildWaitingView()
+            : isComplete
+                ? _buildCompleteView()
+                : _buildSurveyView(),
       ),
     );
   }
@@ -373,11 +416,20 @@ class _LifestyleSurveyPageState extends State<LifestyleSurveyPage> {
                     borderRadius: BorderRadius.circular(16),
                   ),
                 ),
-                onPressed: _canGoNext() ? _onNextPressed : null,
-                child: const Text(
-                  '다음',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
-                ),
+                onPressed: _canGoNext() && !_isSubmittingSurvey ? _onNextPressed : null,
+                child: _isSubmittingSurvey
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                        ),
+                      )
+                    : const Text(
+                        '다음',
+                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+                      ),
               ),
             ),
           ],
@@ -415,6 +467,93 @@ class _LifestyleSurveyPageState extends State<LifestyleSurveyPage> {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildWaitingView() {
+    return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+      stream: _surveyService.watchCurrentUserRoom(),
+      builder: (
+        BuildContext context,
+        AsyncSnapshot<DocumentSnapshot<Map<String, dynamic>>> snapshot,
+      ) {
+        if (snapshot.hasData) {
+          final Map<String, dynamic>? roomData = snapshot.data?.data();
+          final bool isAllCompleted =
+              _surveyService.isAllMembersCompletedFromData(roomData);
+
+          if (isAllCompleted) {
+            return _buildCompleteView();
+          }
+        }
+
+        final List<dynamic> memberIds =
+            (snapshot.data?.data()?['memberIds'] as List<dynamic>?) ?? <dynamic>[];
+        final List<dynamic> completedIds = (snapshot.data
+                ?.data()?['surveyCompletedMemberIds'] as List<dynamic>?) ??
+            <dynamic>[];
+
+        return Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              const SizedBox(height: 24),
+              const Text(
+                '설문 완료 대기 중',
+                style: TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF1E1D24),
+                ),
+              ),
+              const SizedBox(height: 10),
+              const Text(
+                '다른 룸메이트가 설문을 완료하면\n방 규칙 정하기 화면이 열려요.',
+                style: TextStyle(
+                  fontSize: 16,
+                  height: 1.5,
+                  color: Color(0xFF717182),
+                ),
+              ),
+              const SizedBox(height: 28),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF5F5F7),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: <Widget>[
+                    const Text(
+                      '설문 완료 인원',
+                      style: TextStyle(fontSize: 15, color: Color(0xFF1E1D24)),
+                    ),
+                    Text(
+                      '${completedIds.length} / ${memberIds.length}',
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF6C5CE7),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Spacer(),
+              const SizedBox(
+                width: double.infinity,
+                child: Center(
+                  child: CircularProgressIndicator(color: Color(0xFF6C5CE7)),
+                ),
+              ),
+              const SizedBox(height: 34),
+            ],
+          ),
+        );
+      },
     );
   }
 

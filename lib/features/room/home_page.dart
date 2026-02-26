@@ -30,7 +30,7 @@ class _HomePageState extends State<HomePage> {
   void initState() {
     super.initState();
     _roomFuture = _roomService.getCurrentUserRoom();
-    _elapsedTicker = Timer.periodic(const Duration(seconds: 1), (_) {
+    _elapsedTicker = Timer.periodic(const Duration(minutes: 1), (_) {
       if (!mounted || _savedNotes.isEmpty) return;
       setState(() {});
     });
@@ -45,8 +45,7 @@ class _HomePageState extends State<HomePage> {
 
   String _formatElapsed(DateTime createdAt) {
     final Duration diff = DateTime.now().difference(createdAt);
-    if (diff.inSeconds < 60) return '${max(1, diff.inSeconds)}초 전';
-    if (diff.inMinutes < 60) return '${diff.inMinutes}분 전';
+    if (diff.inMinutes < 60) return '${max(1, diff.inMinutes)}분 전';
     return '${diff.inHours}시간 전';
   }
 

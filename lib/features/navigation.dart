@@ -69,7 +69,17 @@ class _NavigationState extends State<Navigation> {
       ),
     );
   }
-  
+
+  Widget _buildNavIcon(String assetPath, bool isActive) {
+    const activeColor = Color(0xff6C5CE7);
+    const inactiveColor = Color(0xff717182);
+    return ImageIcon(
+      AssetImage(assetPath),
+      size: 24,
+      color: isActive ? activeColor : inactiveColor,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return PopScope(
@@ -98,23 +108,39 @@ class _NavigationState extends State<Navigation> {
         ),
         bottomNavigationBar: BottomNavigationBar(
           backgroundColor: Colors.white,
-          selectedItemColor: Colors.black,
-          unselectedItemColor: Colors.grey,
+          selectedItemColor: const Color(0xff6C5CE7),
+          unselectedItemColor: const Color(0xff717182),
+          selectedFontSize: 11,
+          unselectedFontSize: 11,
           currentIndex: _selectedIndex,
           onTap: _onItemTapped,
           type: BottomNavigationBarType.fixed,
-          items: const [
-            BottomNavigationBarItem(icon: Icon(Icons.home), label: '홈'),
-            BottomNavigationBarItem(icon: Icon(Icons.group), label: '룸'),
+          items: [
             BottomNavigationBarItem(
-              icon: Icon(Icons.assignment),
-              label: '활동 기록',
+              icon: _buildNavIcon('assets/images/home.png', false),
+              activeIcon: _buildNavIcon('assets/images/home.png', true),
+              label: '홈',
             ),
             BottomNavigationBarItem(
-              icon: Icon(Icons.alarm),
+              icon: _buildNavIcon('assets/images/people.png', false),
+              activeIcon: _buildNavIcon('assets/images/people.png', true),
+              label: '룸메',
+            ),
+            BottomNavigationBarItem(
+              icon: _buildNavIcon('assets/images/clean.png', false),
+              activeIcon: _buildNavIcon('assets/images/clean.png', true),
+              label: '치워줘',
+            ),
+            BottomNavigationBarItem(
+              icon: _buildNavIcon('assets/images/moon.png', false),
+              activeIcon: _buildNavIcon('assets/images/moon.png', true),
               label: '깨워줘',
             ),
-            BottomNavigationBarItem(icon: Icon(Icons.person), label: '마이'),
+            BottomNavigationBarItem(
+              icon: _buildNavIcon('assets/images/person.png', false),
+              activeIcon: _buildNavIcon('assets/images/person.png', true),
+              label: '마이',
+            ),
           ],
         ),
       ),
