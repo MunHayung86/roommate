@@ -3,7 +3,6 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../../models/user_model.dart';
 
 class AuthService {
-  final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
   Future<void> saveUserToFirestore(User user, String nickname) async {
@@ -11,15 +10,26 @@ class AuthService {
         _firestore.collection('users').doc(user.uid);
 
     final docSnapshot = await userDoc.get();
+    final UserModel newUser = UserModel(
+      uid: user.uid,
+      email: user.email ?? '',
+      nickname: nickname,
+      photoUrl: user.photoURL,
+    );
 
     if (!docSnapshot.exists) {
-      final newUser = UserModel(
-        uid: user.uid,
-        email: user.email ?? '',
-        nickname: nickname,
-      );
-
       await userDoc.set(newUser.toMap());
+      return;
     }
+
+    await userDoc.set(
+      <String, dynamic>{
+        'email': user.email ?? '',
+        'nickname': nickname,
+        'photoUrl': user.photoURL,
+        'lastLoginAt': FieldValue.serverTimestamp(),
+      },
+      SetOptions(merge: true),
+    );
   }
 }
