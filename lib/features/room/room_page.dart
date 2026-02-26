@@ -24,7 +24,7 @@ class _RoomPageState extends State<RoomPage> {
   }
 
   Future<void> _loadRoomAndMembers() async {
-    final roomSnap = await _roomService.getCurrentUserRoom();
+    final roomSnap = await _roomService.getCurrentUserRoom(fromServer: true);
     if (!mounted) return;
     if (roomSnap == null || !roomSnap.exists) {
       setState(() {
@@ -144,10 +144,22 @@ class _RoomPageState extends State<RoomPage> {
 
   Widget _buildRulesSection() {
     if (_rules.isEmpty) {
-      return Center(
-        child: Column(
-          children: [
-            const Text('😵', style: TextStyle(fontSize: 23)),
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            '📋 방 규칙',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w500,
+              color: Color(0xff1E1D24),
+            ),
+          ),
+          const SizedBox(height: 16),
+          Center(
+            child: Column(
+              children: [
+                const Text('😵', style: TextStyle(fontSize: 23)),
             const SizedBox(height: 8),
             const Text(
               '아직 방 규칙이 없어요',
@@ -197,8 +209,10 @@ class _RoomPageState extends State<RoomPage> {
                 ),
               ),
             ),
-          ],
-        ),
+              ],
+            ),
+          ),
+        ],
       );
     }
 
@@ -207,17 +221,15 @@ class _RoomPageState extends State<RoomPage> {
       children: [
         Row(
           children: [
-            const Text('📋', style: TextStyle(fontSize: 18)),
-            const SizedBox(width: 6),
             const Text(
-              '방 규칙',
+              '📋 방 규칙',
               style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.w500,
                 color: Color(0xff1E1D24),
               ),
             ),
-            const SizedBox(width: 4),
+            const SizedBox(width: 8),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
               decoration: BoxDecoration(

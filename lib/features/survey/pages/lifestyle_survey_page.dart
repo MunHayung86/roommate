@@ -144,56 +144,6 @@ class _LifestyleSurveyPageState extends State<LifestyleSurveyPage> {
     _syncSleepAnswer();
   }
 
-  List<_RecommendedRule> _generateRecommendedRules(Map<String, String> answers) {
-    final List<String> ruleTexts = <String>[
-      '손님 초대 시 사전에 룸메이트에게 알립니다.',
-      '공용 물건 사용 후 원래 자리에 돌려놓습니다.',
-      '개인 통화는 이어폰 사용을 권장합니다.',
-    ];
-
-    final String? food = answers['food_in_room'];
-    if (food == '냄새 강한 음식은 불가') {
-      ruleTexts.add('냄새가 강한 음식은 공용공간에서만 섭취합니다.');
-    } else if (food == '방 안 음식 자체 불호') {
-      ruleTexts.add('방 안에서는 음식 섭취를 하지 않습니다.');
-    }
-
-    final String? alarm = answers['alarm_style'];
-    if (alarm == '2~3회 이내로만 울렸으면 좋겠다') {
-      ruleTexts.add('아침 알람은 최대 2~3회 이내로 설정합니다.');
-    }
-
-    final String? keyboard = answers['keyboard_sound'];
-    if (keyboard == '밤 시간대 제한 필요') {
-      ruleTexts.add('밤 시간대에는 키보드/타자 소음을 최소화합니다.');
-    }
-
-    final String? standLight = answers['stand_light_after_quiet'];
-    if (standLight == '낮은 밝기로만 사용 가능') {
-      ruleTexts.add('취침 시간 이후 조명은 낮은 밝기로만 사용합니다.');
-    } else if (standLight == '사용 금지') {
-      ruleTexts.add('취침 시간 이후에는 스탠드 조명을 사용하지 않습니다.');
-    }
-
-    final String? returnHome = answers['return_home_style'];
-    if (returnHome == '새벽 1~2시 귀가 잦음' || returnHome == '일정이 불규칙함') {
-      ruleTexts.add('늦은 귀가 시에는 미리 메시지로 공유합니다.');
-    }
-
-    if (answers.containsKey('sleep_time')) {
-      ruleTexts.add('서로의 취침/기상 시간을 존중해 소음을 줄입니다.');
-    }
-
-    final List<String> uniqueTexts = ruleTexts.toSet().toList();
-    return List<_RecommendedRule>.generate(
-      uniqueTexts.length,
-      (int index) => _RecommendedRule(
-        text: uniqueTexts[index],
-        isSelected: index < 3,
-      ),
-    );
-  }
-
   void _toggleRule(int index) {
     setState(() {
       final _RecommendedRule current = _recommendedRules[index];
@@ -237,7 +187,6 @@ class _LifestyleSurveyPageState extends State<LifestyleSurveyPage> {
     }
 
     final Map<String, String> finalAnswers = Map<String, String>.from(_answers);
-    final List<_RecommendedRule> generatedRules = _generateRecommendedRules(finalAnswers);
 
     setState(() {
       _isSubmittingSurvey = true;
@@ -245,7 +194,25 @@ class _LifestyleSurveyPageState extends State<LifestyleSurveyPage> {
 
     try {
       await _surveyService.saveSurveyAnswers(answers: finalAnswers);
-      final bool isAllCompleted = await _surveyService.areAllMembersSurveyCompleted();
+
+      // 방 전체 멤버 설문을 모아 다수결로 대표 답을 정한 뒤, 그걸로 추천 규칙 생성
+      final List<Map<String, String>> roomAnswers =
+          await _surveyService.getRoomSurveyAnswers();
+      final Map<String, String> aggregated =
+          _surveyService.aggregateAnswersByMajority(roomAnswers);
+      final List<String> ruleTexts =
+          _surveyService.generateRecommendedRulesFromAnswers(aggregated);
+      final List<_RecommendedRule> generatedRules = ruleTexts
+          .asMap()
+          .entries
+          .map((e) => _RecommendedRule(
+                text: e.value,
+                isSelected: e.key < 1,
+              ))
+          .toList();
+
+      final bool isAllCompleted =
+          await _surveyService.areAllMembersSurveyCompleted();
 
       if (!mounted) {
         return;
@@ -627,7 +594,7 @@ class _LifestyleSurveyPageState extends State<LifestyleSurveyPage> {
                   ),
                 ),
               ),
-              const SizedBox(height: 14),
+              const SizedBox(height: 26),
               ...List<Widget>.generate(_recommendedRules.length, (int index) {
                 final _RecommendedRule rule = _recommendedRules[index];
                 final bool isEditing = _editingRuleIndex == index;
@@ -730,24 +697,32 @@ class _LifestyleSurveyPageState extends State<LifestyleSurveyPage> {
                     onTap: () => _toggleRule(index),
                     borderRadius: BorderRadius.circular(16),
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                       decoration: BoxDecoration(
-                        color: const Color(0xFFF5F5F7),
+                        color: rule.isSelected
+                            ? const Color.fromRGBO(108, 92, 231, 0.05)
+                            : const Color(0xFFF5F5F7),
                         borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: borderColor),
+                        border: Border.all(color: borderColor, width: 2),
                       ),
                       child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                        crossAxisAlignment: CrossAxisAlignment.center,
                         children: <Widget>[
                           GestureDetector(
                             onTap: () => _toggleRule(index),
                             child: Container(
-                              margin: const EdgeInsets.only(top: 2),
-                              width: 22,
-                              height: 22,
+                              width: 24,
+                              height: 24,
+                              alignment: Alignment.center,
                               decoration: BoxDecoration(
                                 shape: BoxShape.circle,
-                                border: Border.all(color: borderColor),
+                                border: Border.all(
+                                  color: rule.isSelected
+                                      ? const Color(0xFF6C5CE7)
+                                      : const Color(0xFFD1D5DC),
+                                  width: 1.96,
+                                ),
                                 color: rule.isSelected
                                     ? const Color(0xFF6C5CE7)
                                     : Colors.transparent,

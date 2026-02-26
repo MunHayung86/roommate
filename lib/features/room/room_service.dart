@@ -105,7 +105,10 @@ class RoomService {
   }
 
   /// 현재 사용자가 속한 방 정보 가져오기
-  Future<DocumentSnapshot<Map<String, dynamic>>?> getCurrentUserRoom() async {
+  /// [fromServer] true면 캐시 없이 서버에서 최신 데이터를 가져옵니다.
+  Future<DocumentSnapshot<Map<String, dynamic>>?> getCurrentUserRoom({
+    bool fromServer = false,
+  }) async {
     final User? user = _auth.currentUser;
 
     if (user == null) {
@@ -121,6 +124,12 @@ class RoomService {
       return null;
     }
 
+    if (fromServer) {
+      return _firestore
+          .collection('rooms')
+          .doc(roomId)
+          .get(const GetOptions(source: Source.server));
+    }
     return _firestore.collection('rooms').doc(roomId).get();
   }
 
