@@ -1,4 +1,8 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:google_sign_in/google_sign_in.dart';
+import 'package:roommate/features/room/room_service.dart';
 
 class MyPage extends StatefulWidget {
   const MyPage({super.key});
@@ -8,8 +12,98 @@ class MyPage extends StatefulWidget {
 }
 
 class _MyPageState extends State<MyPage> {
+  final RoomService _roomService = RoomService();
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+
+  String _nickname = '';
+  String _roomName = '';
+  String? _photoUrl;
+  bool _loaded = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUserAndRoom();
+  }
+
+  Future<void> _loadUserAndRoom() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      setState(() => _loaded = true);
+      return;
+    }
+    final userDoc = await _firestore.collection('users').doc(user.uid).get();
+    final data = userDoc.data();
+    final nickname = data?['nickname'] as String? ?? user.displayName ?? '사용자';
+    final roomId = data?['roomId'] as String?;
+    String roomName = '';
+    if (roomId != null) {
+      final roomDoc = await _firestore.collection('rooms').doc(roomId).get();
+      roomName = roomDoc.data()?['name'] as String? ?? '';
+    }
+    if (!mounted) return;
+    setState(() {
+      _nickname = nickname;
+      _roomName = roomName;
+      _photoUrl = data?['photoUrl'] as String? ?? user.photoURL;
+      _loaded = true;
+    });
+  }
+
+  Future<void> _leaveRoom() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('방 나가기'),
+        content: const Text('정말 방을 나가시겠어요?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('취소'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('나가기', style: TextStyle(color: Color(0xffE7000B))),
+          ),
+        ],
+      ),
+    );
+    if (confirm != true || !mounted) return;
+    try {
+      await _roomService.leaveRoom();
+      if (!mounted) return;
+      Navigator.of(context, rootNavigator: true).pushNamedAndRemoveUntil(
+        '/room_select',
+        (route) => false,
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('방 나가기에 실패했어요. $e')),
+      );
+    }
+  }
+
+  Future<void> _logout() async {
+    try {
+      await FirebaseAuth.instance.signOut();
+      await GoogleSignIn().signOut();
+    } catch (_) {}
+    if (!mounted) return;
+    Navigator.of(context, rootNavigator: true).pushNamedAndRemoveUntil(
+      '/login',
+      (route) => false,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    if (!_loaded) {
+      return const Scaffold(
+        backgroundColor: Color(0xffFBFBFE),
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
     return Scaffold(
       backgroundColor: const Color(0xffFBFBFE),
       body: Column(
@@ -72,22 +166,34 @@ class _MyPageState extends State<MyPage> {
                               ),
                             ],
                           ),
-                          child: const Center(
-                            child: Text('😊', style: TextStyle(fontSize: 48)),
+                          child: ClipOval(
+                            child: _photoUrl != null && _photoUrl!.isNotEmpty
+                                ? Image.network(
+                                    _photoUrl!,
+                                    width: 96,
+                                    height: 96,
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (_, __, ___) => const Center(
+                                      child: Text('😊', style: TextStyle(fontSize: 48)),
+                                    ),
+                                  )
+                                : const Center(
+                                    child: Text('😊', style: TextStyle(fontSize: 48)),
+                                  ),
                           ),
                         ),
                         const SizedBox(height: 16),
-                        const Text(
-                          '김민준',
-                          style: TextStyle(
+                        Text(
+                          _nickname,
+                          style: const TextStyle(
                             fontSize: 24,
                             fontWeight: FontWeight.w500,
                             color: Color(0xff0a0a0a),
                           ),
                         ),
-                        const Text(
-                          '302호',
-                          style: TextStyle(fontSize: 16, color: Color(0xff6a7282)),
+                        Text(
+                          _roomName.isEmpty ? '참여한 방 없음' : _roomName,
+                          style: const TextStyle(fontSize: 16, color: Color(0xff6a7282)),
                         ),
                       ],
                     ),
@@ -96,7 +202,12 @@ class _MyPageState extends State<MyPage> {
                   _MenuButton(
                     backgroundColor: Colors.white,
                     borderColor: const Color(0xffE5E7EB),
-                    onTap: () {},
+                    onTap: () {
+                      Navigator.of(context, rootNavigator: true).pushNamed(
+                        '/survey',
+                        arguments: true,
+                      ).then((_) => _loadUserAndRoom());
+                    },
                     iconPath: 'assets/images/mypage_icon_1.png',
                     label: '라이프스타일 다시 설정하기',
                     labelColor: const Color(0xff0A0A0A),
@@ -132,7 +243,7 @@ class _MyPageState extends State<MyPage> {
                   _MenuButton(
                     backgroundColor: const Color(0xffFEF2F2),
                     borderColor: const Color(0xffFFC9C9),
-                    onTap: () {},
+                    onTap: _leaveRoom,
                     iconPath: 'assets/images/mypage_icon_5.png',
                     label: '방 나가기',
                     labelColor: const Color(0xffE7000B),
@@ -142,12 +253,15 @@ class _MyPageState extends State<MyPage> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const Text(
-                        '회원 탈퇴',
-                        style: TextStyle(
-                          fontSize: 12.8,
-                          fontWeight: FontWeight.w500,
-                          color: Color(0xffB0B8C1),
+                      GestureDetector(
+                        onTap: _logout,
+                        child: const Text(
+                          '로그아웃',
+                          style: TextStyle(
+                            fontSize: 12.8,
+                            fontWeight: FontWeight.w500,
+                            color: Color(0xffB0B8C1),
+                          ),
                         ),
                       ),
                       const SizedBox(width: 23),

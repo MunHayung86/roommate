@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:roommate/features/auth/login_page.dart';
 import 'package:roommate/features/navigation.dart';
+import 'package:roommate/features/splash/splash_page.dart';
 import 'package:roommate/features/room/create_room_page.dart';
 import 'package:roommate/features/room/join_room_page.dart';
 import 'package:roommate/features/room/room_page.dart';
@@ -29,8 +30,9 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'roommate',
-      initialRoute: '/login',
+      initialRoute: '/splash',
       routes: {
+        '/splash': (context) => const SplashPage(),
         '/login': (context) => const LoginPage(),
         '/home': (context) => const Navigation(),
         '/room_select': (context) => const RoomSelectPage(),

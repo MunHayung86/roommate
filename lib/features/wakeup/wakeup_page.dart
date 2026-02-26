@@ -17,15 +17,15 @@ class _WakeupPageState extends State<WakeupPage> {
   int _selectedMinute = 0;
   bool _isOn = false; // alarm OFF by default per design
 
-  final FixedExtentScrollController _hourController = FixedExtentScrollController(initialItem: 7); // 8시 -> index 7
+  final FixedExtentScrollController _hourController = FixedExtentScrollController(initialItem: 7);
   final FixedExtentScrollController _minuteController = FixedExtentScrollController(initialItem: 0);
-  final FixedExtentScrollController _ampmController = FixedExtentScrollController(initialItem: 0); // 오전
+  final FixedExtentScrollController _ampmController = FixedExtentScrollController(initialItem: 0);
 
   int get _hour12 => _selectedHour24 == 0 ? 12 : _selectedHour24 > 12 ? _selectedHour24 - 12 : _selectedHour24;
   int get _selectedHourIndex => _hour12 - 1;
   int get _selectedAmpmIndex => _selectedHour24 < 12 ? 0 : 1;
 
-  /// 룸메이트 기상 현황. 나중에 Firestore(방 멤버 + 기상 설정)에서 불러와 대체
+  /// 룸메이트 기상 현황 (목업)
   List<RoommateWakeupItem> get _roommateWakeupList => [
         const RoommateWakeupItem(
           id: '1',
@@ -77,7 +77,7 @@ class _WakeupPageState extends State<WakeupPage> {
           const Padding(
             padding: EdgeInsets.fromLTRB(20, 74, 20, 0),
             child: Text(
-              '깨워줘 제발 😴',
+              '깨워줘제발 😴',
               style: TextStyle(
                 fontSize: 20,
                 fontWeight: FontWeight.w500,
@@ -95,7 +95,6 @@ class _WakeupPageState extends State<WakeupPage> {
             Container(
               width: double.infinity,
               height: 341.47,
-              padding: const EdgeInsets.fromLTRB(24.65, 24.65, 24.65, 0.65),
               decoration: BoxDecoration(
                 color: Colors.white,
                 border: Border.all(color: const Color(0xffE9ECEF), width: 0.65),
@@ -115,213 +114,229 @@ class _WakeupPageState extends State<WakeupPage> {
                   ),
                 ],
               ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
+              child: Stack(
                 children: [
-                  const Text(
-                    '나의 기상 설정',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Color(0xff868E96),
+                  const Positioned(
+                    left: 24.65,
+                    top: 24.65,
+                    child: Text(
+                      '나의 기상 설정',
+                      style: TextStyle(
+                        fontFamily: 'Pretendard',
+                        fontSize: 14,
+                        fontWeight: FontWeight.w400,
+                        height: 21 / 14,
+                        letterSpacing: 0,
+                        color: Color(0xff868E96),
+                      ),
                     ),
                   ),
-                  const SizedBox(height: 4),
-                  SizedBox(
-                    height: 160,
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: ListWheelScrollView.useDelegate(
-                            controller: _hourController,
-                            itemExtent: 40,
-                            physics: const FixedExtentScrollPhysics(),
-                            onSelectedItemChanged: _onHourChanged,
-                            childDelegate: ListWheelChildBuilderDelegate(
-                              builder: (context, index) {
-                                if (index < 0 || index >= _hours12.length) return null;
-                                final isSelected = index == _selectedHourIndex;
-                                return Center(
-                                  child: Text(
-                                    '${_hours12[index]}',
-                                    style: TextStyle(
-                                      fontSize: isSelected ? 22 : 20,
-                                      fontWeight: isSelected ? FontWeight.w700 : FontWeight.normal,
-                                      height: isSelected ? 26 / 22 : 1.0,
-                                      color: isSelected ? const Color(0xff000000) : const Color(0xffADB5BD),
-                                    ),
-                                  ),
-                                );
-                              },
-                            ),
-                          ),
-                        ),
-                        SizedBox(width: 40),
-                        Expanded(
-                          child: ListWheelScrollView.useDelegate(
-                            controller: _minuteController,
-                            itemExtent: 40,
-                            physics: const FixedExtentScrollPhysics(),
-                            onSelectedItemChanged: (index) {
-                              setState(() => _selectedMinute = _minutes[index]);
-                            },
-                            childDelegate: ListWheelChildBuilderDelegate(
-                              builder: (context, index) {
-                                if (index < 0 || index >= _minutes.length) return null;
-                                final isSelected = index == _selectedMinute;
-                                final label = _minutes[index].toString().padLeft(2, '0');
-                                return Center(
-                                  child: Text(
-                                    label,
-                                    style: TextStyle(
-                                      fontSize: 20,
-                                      fontWeight: isSelected ? FontWeight.w700 : FontWeight.normal,
-                                      color: isSelected ? const Color(0xff212529) : const Color(0xffADB5BD),
-                                    ),
-                                  ),
-                                );
-                              },
-                            ),
-                          ),
-                        ),
-                        Expanded(
-                          child: ListWheelScrollView.useDelegate(
-                            controller: _ampmController,
-                            itemExtent: 40,
-                            physics: const FixedExtentScrollPhysics(),
-                            onSelectedItemChanged: _onAmpmChanged,
-                            childDelegate: ListWheelChildBuilderDelegate(
-                              builder: (context, index) {
-                                if (index < 0 || index >= _ampm.length) return null;
-                                final isSelected = index == _selectedAmpmIndex;
-                                return Center(
-                                  child: Text(
-                                    _ampm[index],
-                                    style: TextStyle(
-                                      fontSize: 20,
-                                      fontWeight: isSelected ? FontWeight.w700 : FontWeight.normal,
-                                      color: isSelected ? const Color(0xff212529) : const Color(0xffADB5BD),
-                                    ),
-                                  ),
-                                );
-                              },
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        GestureDetector(
-                          onTap: () => setState(() => _isOn = !_isOn),
-                          child: AnimatedContainer(
-                            duration: const Duration(milliseconds: 180),
-                            width: 56,
-                            height: 96,
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(24),
-                              color: _isOn ? const Color(0xffFFF4CF) : const Color(0xffF8F9FA),
-                              boxShadow: _isOn
-                                  ? [
-                                      BoxShadow(
-                                        color: const Color.fromRGBO(255, 201, 74, 0.5),
-                                        blurRadius: 18,
-                                        spreadRadius: -4,
-                                        offset: const Offset(4, 0),
+                  Positioned(
+                    left: 24.65,
+                    right: 24.65,
+                    top: 44,
+                    child: SizedBox(
+                      height: 128,
+                      child: Row(
+                        children: [
+                          Flexible(
+                            flex: 4,
+                            child: ListWheelScrollView.useDelegate(
+                              controller: _hourController,
+                              itemExtent: 36,
+                              physics: const FixedExtentScrollPhysics(),
+                              onSelectedItemChanged: _onHourChanged,
+                              childDelegate: ListWheelChildBuilderDelegate(
+                                builder: (context, index) {
+                                  if (index < 0 || index >= _hours12.length) return null;
+                                  final isSelected = index == _selectedHourIndex;
+                                    return Center(
+                                      child: Text(
+                                        '${_hours12[index]}',
+                                        style: TextStyle(
+                                          fontSize: isSelected ? 20 : 18,
+                                          fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+                                          height: 1.0,
+                                          color: isSelected ? const Color(0xff111111) : const Color(0xffE2E2E2),
+                                        ),
                                       ),
-                                    ]
-                                  : null,
-                            ),
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Text(
-                                  'zZ',
-                                  style: TextStyle(
-                                    fontSize: 22,
-                                    fontWeight: FontWeight.w600,
-                                    color: _isOn ? const Color(0xffFFAE00) : const Color(0xffADB5BD),
-                                  ),
-                                ),
-                                const SizedBox(height: 6),
-                                Text(
-                                  _isOn ? 'ON' : 'OFF',
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w600,
-                                    color: _isOn ? const Color(0xffFFAE00) : const Color(0xffADB5BD),
-                                  ),
-                                ),
-                              ],
+                                  );
+                                },
+                              ),
                             ),
                           ),
-                        ),
-                      ],
+                          const SizedBox(width: 0),
+                          Flexible(
+                            flex: 4,
+                            child: ListWheelScrollView.useDelegate(
+                              controller: _minuteController,
+                              itemExtent: 36,
+                              physics: const FixedExtentScrollPhysics(),
+                              onSelectedItemChanged: (index) {
+                                setState(() => _selectedMinute = _minutes[index]);
+                              },
+                              childDelegate: ListWheelChildBuilderDelegate(
+                                builder: (context, index) {
+                                  if (index < 0 || index >= _minutes.length) return null;
+                                  final isSelected = index == _selectedMinute;
+                                  final label = _minutes[index].toString().padLeft(2, '0');
+                                    return Center(
+                                      child: Text(
+                                        label,
+                                        style: TextStyle(
+                                          fontSize: isSelected ? 20 : 18,
+                                          fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+                                          color: isSelected ? const Color(0xff111111) : const Color(0xffE2E2E2),
+                                        ),
+                                      ),
+                                  );
+                                },
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 0),
+                          Flexible(
+                            flex: 3,
+                            child: ListWheelScrollView.useDelegate(
+                              controller: _ampmController,
+                              itemExtent: 36,
+                              physics: const FixedExtentScrollPhysics(),
+                              onSelectedItemChanged: _onAmpmChanged,
+                              childDelegate: ListWheelChildBuilderDelegate(
+                                builder: (context, index) {
+                                  if (index < 0 || index >= _ampm.length) return null;
+                                  final isSelected = index == _selectedAmpmIndex;
+                                    return Center(
+                                      child: Text(
+                                        _ampm[index],
+                                        style: TextStyle(
+                                          fontSize: isSelected ? 16 : 14,
+                                          fontWeight: isSelected ? FontWeight.w500 : FontWeight.w400,
+                                          color: isSelected ? const Color(0xff111111) : const Color(0xffE2E2E2),
+                                        ),
+                                      ),
+                                  );
+                                },
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 1),
+                          _buildAlarmToggleButton(),
+                        ],
+                      ),
                     ),
                   ),
-                  const SizedBox(height: 28),
-                  Center(
-                    child: Material(
-                      color: Colors.transparent,
-                      child: InkWell(
-                        onTap: () {},
-                        borderRadius: BorderRadius.circular(32.06),
+                  Positioned(
+                    left: 0,
+                    right: 0,
+                    top: 224.35,
+                    child: Center(
+                      child: SizedBox(
+                        width: 224.43,
+                        height: 64.12,
                         child: Container(
-                          width: 224.43,
-                          height: 64.12,
-                          alignment: Alignment.center,
+                          width: double.infinity,
+                          height: double.infinity,
+                          padding: const EdgeInsets.all(4),
                           decoration: BoxDecoration(
-                            gradient: const LinearGradient(
-                              colors: [
-                                Color(0xffFF7262),
-                                Color(0xffFFAB61),
-                              ],
-                              begin: Alignment.centerLeft,
-                              end: Alignment.centerRight,
-                            ),
-                            borderRadius: BorderRadius.circular(32.06),
-                            border: Border.all(
-                              color: Colors.white,
-                              width: 1.5,
-                            ),
-                            boxShadow: [
-                              const BoxShadow(
-                                color: Color.fromRGBO(255, 255, 255, 0.4),
-                                blurRadius: 4,
-                                spreadRadius: 0,
-                                offset: Offset(0, 0),
-                              ),
-                              const BoxShadow(
-                                color: Color.fromRGBO(224, 217, 243, 0.6),
-                                blurRadius: 24,
+                            color: const Color(0xffE7E9F3),
+                            borderRadius: BorderRadius.circular(42),
+                            boxShadow: const [
+                              BoxShadow(
+                                color: Color.fromRGBO(220, 222, 236, 0.75),
+                                blurRadius: 14,
                                 spreadRadius: 2,
-                                offset: Offset(0, 0),
-                              ),
-                              const BoxShadow(
-                                color: Color.fromRGBO(224, 217, 243, 0.35),
-                                blurRadius: 40,
-                                spreadRadius: 4,
-                                offset: Offset(0, 0),
+                                offset: Offset(0, 3),
                               ),
                             ],
                           ),
-                          child: const Text(
-                            'SOS',
-                            style: TextStyle(
-                              fontSize: 28,
-                              fontWeight: FontWeight.w700,
-                              color: Color(0xFFFFFFFF),
-                              letterSpacing: 1,
+                          child: Material(
+                            color: Colors.transparent,
+                            child: InkWell(
+                              onTap: () {},
+                              borderRadius: BorderRadius.circular(32.06),
+                              child: Ink(
+                                height: double.infinity,
+                                decoration: BoxDecoration(
+                                  gradient: const LinearGradient(
+                                    begin: Alignment.centerLeft,
+                                    end: Alignment.centerRight,
+                                    colors: [
+                                      Color(0xffFF8A85),
+                                      Color(0xffFFB45B),
+                                      Color(0xffF9B161),
+                                      Color(0xffFFB45B),
+                                      Color(0xffFF7774),
+                                    ],
+                                    stops: [0.0, 0.35, 0.5, 0.65, 1.0],
+                                  ),
+                                  borderRadius: BorderRadius.circular(32.06),
+                                  border: Border.all(
+                                    color: Color(0xffffffff),
+                                    width: 1.0,
+                                  ),
+                                  boxShadow: const [
+                                    BoxShadow(
+                                      color: Color.fromRGBO(255, 255, 255, 0.9),
+                                      offset: Offset(-5.4, -5.4),
+                                      blurRadius: 10.7,
+                                      spreadRadius: 0,
+                                    ),
+                                    BoxShadow(
+                                      color: Color.fromRGBO(255, 255, 255, 0.75),
+                                      offset: Offset(1.4, 1.4),
+                                      blurRadius: 10.7,
+                                      spreadRadius: 0,
+                                    ),
+                                    BoxShadow(
+                                      color: Color.fromRGBO(224, 217, 243, 0.7),
+                                      offset: Offset(2.7, 2.7),
+                                      blurRadius: 21.5,
+                                      spreadRadius: 0,
+                                    ),
+                                    BoxShadow(
+                                      color: Color.fromRGBO(224, 217, 243, 0.5),
+                                      offset: Offset(-10.7, -10.7),
+                                      blurRadius: 21.5,
+                                      spreadRadius: 0,
+                                    ),
+                                  ],
+                                ),
+                                child: const Center(
+                                  child: Text(
+                                    'SOS',
+                                    style: TextStyle(
+                                      fontFamily: 'Pretendard',
+                                      fontSize: 32,
+                                      fontWeight: FontWeight.w700,
+                                      height: 1.0,
+                                      color: Color(0xFFFFFFFF),
+                                      letterSpacing: 0,
+                                    ),
+                                  ),
+                                ),
+                              ),
                             ),
                           ),
                         ),
                       ),
                     ),
                   ),
-                  const SizedBox(height: 20),
-                  const Center(
-                    child: Text(
-                      '긴급 요청으로 룸메에게 간절하게 부탁해요..!',
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: Color(0xff748AB0),
+                  const Positioned(
+                    left: 0,
+                    right: 0,
+                    top: 298.47,
+                    child: Center(
+                      child: Text(
+                        '긴급 요청으로 룸메에게 간절하게 부탁해요..!',
+                        style: TextStyle(
+                          fontFamily: 'Pretendard',
+                          fontSize: 12.8,
+                          fontWeight: FontWeight.w400,
+                          height: 19.2 / 12.8,
+                          letterSpacing: 0,
+                          color: Color(0xff5C7CFA),
+                        ),
                       ),
                     ),
                   ),
@@ -363,6 +378,57 @@ class _WakeupPageState extends State<WakeupPage> {
   ],
   ),
   );
+  }
+
+  Widget _buildAlarmToggleButton() {
+    return GestureDetector(
+      onTap: () => setState(() => _isOn = !_isOn),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        width: 56,
+        height: 85,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(0),
+          color: _isOn
+              ? const Color(0xffFFF4CF)
+              : const Color(0xffFFFFFF),
+          boxShadow: _isOn
+              ? [
+                  const BoxShadow(
+                    color: Color.fromRGBO(255, 201, 74, 0.5),
+                    blurRadius: 18,
+                    spreadRadius: -4,
+                    offset: Offset(4, 0),
+                  ),
+                ]
+              : null,
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(
+              'zZ',
+              style: TextStyle(
+                fontSize: 8,
+                fontWeight: FontWeight.w600,
+                color: _isOn ? const Color(0xffFFAE00) : const Color(0xffA09F9A),
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              _isOn ? 'ON' : 'OFF',
+              style: TextStyle(
+                fontSize: 6,
+                fontWeight: FontWeight.w600,
+                color: _isOn
+                    ? const Color(0xffFFAE00)
+                    : const Color(0xff717182).withValues(alpha: 0.5),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 
@@ -432,7 +498,7 @@ class _RoommateWakeupCard extends StatelessWidget {
           width: 40,
           height: 40,
           fit: BoxFit.cover,
-          errorBuilder: (_, __, ___) => _defaultAvatar(),
+          errorBuilder: (context, error, stackTrace) => _defaultAvatar(),
         ),
       );
     }
