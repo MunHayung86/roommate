@@ -16,6 +16,7 @@ class _WakeupPageState extends State<WakeupPage> {
   int _selectedHour24 = 8; // 0-23, 8 = 8:00 AM
   int _selectedMinute = 0;
   bool _isOn = false; // alarm OFF by default per design
+  bool _isSosActive = false;
 
   final FixedExtentScrollController _hourController = FixedExtentScrollController(initialItem: 7);
   final FixedExtentScrollController _minuteController = FixedExtentScrollController(initialItem: 0);
@@ -33,6 +34,13 @@ class _WakeupPageState extends State<WakeupPage> {
           wakeupTime: '07:00',
           isAlarmOn: true,
           isHighlighted: true,
+        ),
+        const RoommateWakeupItem(
+          id: 'sos_like_1',
+          name: '이서준',
+          wakeupTime: '07:00',
+          isAlarmOn: true,
+          isSosStyled: true,
         ),
         const RoommateWakeupItem(
           id: '2',
@@ -97,7 +105,12 @@ class _WakeupPageState extends State<WakeupPage> {
               height: 341.47,
               decoration: BoxDecoration(
                 color: Colors.white,
-                border: Border.all(color: const Color(0xffE9ECEF), width: 0.65),
+                border: Border.all(
+                  color: _isSosActive
+                      ? const Color(0xffFF7E7B)
+                      : const Color(0xffE9ECEF),
+                  width: _isSosActive ? 2.0 : 0.65,
+                ),
                 borderRadius: BorderRadius.circular(24),
                 boxShadow: const [
                   BoxShadow(
@@ -139,8 +152,8 @@ class _WakeupPageState extends State<WakeupPage> {
                       height: 128,
                       child: Row(
                         children: [
-                          Flexible(
-                            flex: 4,
+                          SizedBox(
+                            width: 58,
                             child: ListWheelScrollView.useDelegate(
                               controller: _hourController,
                               itemExtent: 36,
@@ -165,9 +178,9 @@ class _WakeupPageState extends State<WakeupPage> {
                               ),
                             ),
                           ),
-                          const SizedBox(width: 0),
-                          Flexible(
-                            flex: 4,
+                          const SizedBox(width: 4),
+                          SizedBox(
+                            width: 58,
                             child: ListWheelScrollView.useDelegate(
                               controller: _minuteController,
                               itemExtent: 36,
@@ -194,9 +207,9 @@ class _WakeupPageState extends State<WakeupPage> {
                               ),
                             ),
                           ),
-                          const SizedBox(width: 0),
-                          Flexible(
-                            flex: 3,
+                          const SizedBox(width: 4),
+                          SizedBox(
+                            width: 48,
                             child: ListWheelScrollView.useDelegate(
                               controller: _ampmController,
                               itemExtent: 36,
@@ -220,7 +233,8 @@ class _WakeupPageState extends State<WakeupPage> {
                               ),
                             ),
                           ),
-                          const SizedBox(width: 1),
+                          const Spacer(),
+                          const SizedBox(width: 8),
                           _buildAlarmToggleButton(),
                         ],
                       ),
@@ -241,6 +255,10 @@ class _WakeupPageState extends State<WakeupPage> {
                           decoration: BoxDecoration(
                             color: const Color(0xffE7E9F3),
                             borderRadius: BorderRadius.circular(42),
+                            border: Border.all(
+                              color: const Color(0xffffffff),
+                              width: 1.0,
+                            ),
                             boxShadow: const [
                               BoxShadow(
                                 color: Color.fromRGBO(220, 222, 236, 0.75),
@@ -253,7 +271,7 @@ class _WakeupPageState extends State<WakeupPage> {
                           child: Material(
                             color: Colors.transparent,
                             child: InkWell(
-                              onTap: () {},
+                              onTap: () => setState(() => _isSosActive = !_isSosActive),
                               borderRadius: BorderRadius.circular(32.06),
                               child: Ink(
                                 height: double.infinity,
@@ -272,7 +290,7 @@ class _WakeupPageState extends State<WakeupPage> {
                                   ),
                                   borderRadius: BorderRadius.circular(32.06),
                                   border: Border.all(
-                                    color: Color(0xffffffff),
+                                    color: const Color(0xffffffff),
                                     width: 1.0,
                                   ),
                                   boxShadow: const [
@@ -322,14 +340,16 @@ class _WakeupPageState extends State<WakeupPage> {
                       ),
                     ),
                   ),
-                  const Positioned(
+                  Positioned(
                     left: 0,
                     right: 0,
                     top: 298.47,
                     child: Center(
                       child: Text(
-                        '긴급 요청으로 룸메에게 간절하게 부탁해요..!',
-                        style: TextStyle(
+                        _isSosActive
+                            ? 'SOS 버튼을 다시 눌러 긴급 요청을 해제할 수 있어요'
+                            : '긴급 요청으로 룸메에게 간절하게 부탁해요..!',
+                        style: const TextStyle(
                           fontFamily: 'Pretendard',
                           fontSize: 12.8,
                           fontWeight: FontWeight.w400,
@@ -353,7 +373,7 @@ class _WakeupPageState extends State<WakeupPage> {
                   padding: const EdgeInsets.only(bottom: 12),
                   child: _RoommateWakeupCard(item: item),
                 )),
-            SizedBox(height: 16),
+            SizedBox(height: 3.99),
             Container(
               width: double.infinity,
               height: 45,
@@ -383,46 +403,94 @@ class _WakeupPageState extends State<WakeupPage> {
   Widget _buildAlarmToggleButton() {
     return GestureDetector(
       onTap: () => setState(() => _isOn = !_isOn),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
-        width: 56,
-        height: 85,
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(0),
-          color: _isOn
-              ? const Color(0xffFFF4CF)
-              : const Color(0xffFFFFFF),
-          boxShadow: _isOn
-              ? [
-                  const BoxShadow(
-                    color: Color.fromRGBO(255, 201, 74, 0.5),
-                    blurRadius: 18,
-                    spreadRadius: -4,
-                    offset: Offset(4, 0),
-                  ),
-                ]
-              : null,
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+      child: SizedBox(
+        width: 74,
+        height: 110,
+        child: Stack(
+          alignment: Alignment.center,
           children: [
-            Text(
-              'zZ',
-              style: TextStyle(
-                fontSize: 8,
-                fontWeight: FontWeight.w600,
-                color: _isOn ? const Color(0xffFFAE00) : const Color(0xffA09F9A),
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 220),
+              width: 74,
+              height: 110,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(28),
+                gradient: _isOn
+                    ? const RadialGradient(
+                        center: Alignment(-0.15, -0.2),
+                        radius: 1.05,
+                        colors: [
+                          Color(0x99FFF9E4),
+                          Color(0x80FFE19A),
+                          Color(0x00FFE19A),
+                        ],
+                        stops: [0.0, 0.62, 1.0],
+                      )
+                    : const RadialGradient(
+                        center: Alignment(-0.15, -0.2),
+                        radius: 1.05,
+                        colors: [
+                          Color(0x8FFFFFFF),
+                          Color(0x66E8ECF5),
+                          Color(0x00E8ECF5),
+                        ],
+                        stops: [0.0, 0.62, 1.0],
+                      ),
+                boxShadow: _isOn
+                    ? const [
+                        BoxShadow(
+                          color: Color.fromRGBO(255, 190, 79, 0.33),
+                          blurRadius: 30,
+                          spreadRadius: 6,
+                          offset: Offset(0, 7),
+                        ),
+                      ]
+                    : const [
+                        BoxShadow(
+                          color: Color.fromRGBO(133, 139, 161, 0.2),
+                          blurRadius: 24,
+                          spreadRadius: 4,
+                          offset: Offset(0, 7),
+                        ),
+                      ],
               ),
             ),
-            const SizedBox(height: 6),
-            Text(
-              _isOn ? 'ON' : 'OFF',
-              style: TextStyle(
-                fontSize: 6,
-                fontWeight: FontWeight.w600,
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 220),
+              width: 58,
+              height: 88,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(22),
                 color: _isOn
-                    ? const Color(0xffFFAE00)
-                    : const Color(0xff717182).withValues(alpha: 0.5),
+                    ? const Color(0x3DFFF0C7)
+                    : const Color(0x40FFFFFF),
+              ),
+              child: Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Image.asset(
+                      _isOn
+                          ? 'assets/images/clock_icon.png'
+                          : 'assets/images/zzz_img.png',
+                      width: _isOn ? 24 : 22,
+                      height: _isOn ? 24 : 22,
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      _isOn ? 'ON' : 'OFF',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                        color: _isOn
+                            ? const Color(0xffD28C00)
+                            : const Color(0xff6B7280),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ],
@@ -440,15 +508,31 @@ class _RoommateWakeupCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final backgroundColor = item.isHighlighted
-        ? const Color(0xffFFF9DB)
-        : Colors.white;
-    final borderColor = item.isHighlighted
-        ? const Color.fromRGBO(255, 212, 59, 0.3)
-        : const Color(0xffE9ECEF);
-    final timeColor = item.isAlarmOn
-        ? const Color(0xff212529)
-        : const Color(0xffCED4DA);
+    final backgroundColor = item.isSosStyled
+        ? null
+        : (item.isHighlighted ? const Color(0xffFFF9DB) : Colors.white);
+    final gradient = item.isSosStyled
+        ? const LinearGradient(
+            begin: Alignment.centerLeft,
+            end: Alignment.centerRight,
+            colors: [
+              Color(0xffFF8A85),
+              Color(0xffFFB45B),
+              Color(0xffF9B161),
+              Color(0xffFFB45B),
+              Color(0xffFF7774),
+            ],
+            stops: [0.0, 0.35, 0.5, 0.65, 1.0],
+          )
+        : null;
+    final borderColor = item.isSosStyled
+        ? const Color.fromRGBO(255, 180, 91, 0.7)
+        : (item.isHighlighted
+              ? const Color.fromRGBO(255, 212, 59, 0.3)
+              : const Color(0xffE9ECEF));
+    final contentColor = item.isSosStyled
+        ? const Color(0xffffffff)
+        : (item.isAlarmOn ? const Color(0xff212529) : const Color(0xffCED4DA));
 
     return Container(
       width: double.infinity,
@@ -456,6 +540,7 @@ class _RoommateWakeupCard extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
       decoration: BoxDecoration(
         color: backgroundColor,
+        gradient: gradient,
         border: Border.all(color: borderColor, width: 0.65),
         borderRadius: BorderRadius.circular(16),
       ),
@@ -466,9 +551,11 @@ class _RoommateWakeupCard extends StatelessWidget {
           Expanded(
             child: Text(
               item.name,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 14,
-                color: Color(0xff212529),
+                color: item.isSosStyled
+                    ? const Color(0xffffffff)
+                    : const Color(0xff212529),
               ),
               overflow: TextOverflow.ellipsis,
             ),
@@ -480,7 +567,7 @@ class _RoommateWakeupCard extends StatelessWidget {
             item.wakeupTime,
             style: TextStyle(
               fontSize: 20,
-              color: timeColor,
+              color: contentColor,
             ),
           ),
           SizedBox(width: 20),
@@ -536,6 +623,17 @@ class _RoommateWakeupCard extends StatelessWidget {
   }
 
   Widget _buildStatusIcon() {
+    if (item.isSosStyled) {
+      return const Text(
+        'SOS',
+        style: TextStyle(
+          fontSize: 16,
+          fontWeight: FontWeight.w700,
+          color: Color(0xffffffff),
+        ),
+      );
+    }
+
     if (item.isAlarmOn) {
       return Image.asset(
         'assets/images/clock_icon.png',

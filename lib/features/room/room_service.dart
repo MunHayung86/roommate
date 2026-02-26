@@ -13,8 +13,8 @@ class RoomService {
   ///   motto: String,
   ///   inviteCode: String,        // 6자리 초대 코드 (유니크)
   ///   ownerId: String,           // 방 만든 uid
-  ///   memberIds: List<String>,   // 현재 멤버 uid 목록
-  ///   surveyCompletedMemberIds: List<String>,
+  ///   memberIds: `List<String>`,   // 현재 멤버 uid 목록
+  ///   surveyCompletedMemberIds: `List<String>`,
   ///   rulesGenerated: bool,
   ///   createdAt: Timestamp
   /// }
@@ -143,18 +143,40 @@ class RoomService {
 
     if (!roomDoc.exists) return [];
 
-    final List<dynamic> memberIds =
+    final List<dynamic> memberIdsRaw =
         (roomDoc.data()?['memberIds'] as List<dynamic>?) ?? [];
+    final List<String> orderedMemberIds =
+        memberIdsRaw.map((id) => id.toString()).toList();
 
-    if (memberIds.isEmpty) return [];
+    // Safety net: some rooms may have stale memberIds.
+    // Also collect users that currently point to this room via users.roomId.
+    final QuerySnapshot<Map<String, dynamic>> roomUsersSnapshot = await _firestore
+        .collection('users')
+        .where('roomId', isEqualTo: roomId)
+        .get();
+
+    final Map<String, Map<String, dynamic>> roomUsersByUid = {
+      for (final doc in roomUsersSnapshot.docs) doc.id: doc.data(),
+    };
+    for (final uid in roomUsersByUid.keys) {
+      if (!orderedMemberIds.contains(uid)) {
+        orderedMemberIds.add(uid);
+      }
+    }
+
+    if (orderedMemberIds.isEmpty) return [];
 
     final List<Map<String, dynamic>> members = [];
-    for (final id in memberIds) {
-      final String uid = id.toString();
-      final DocumentSnapshot<Map<String, dynamic>> userDoc =
-          await _firestore.collection('users').doc(uid).get();
-      if (!userDoc.exists) continue;
-      final data = userDoc.data()!;
+    for (final uid in orderedMemberIds) {
+      Map<String, dynamic>? data = roomUsersByUid[uid];
+      if (data == null) {
+        final DocumentSnapshot<Map<String, dynamic>> userDoc =
+            await _firestore.collection('users').doc(uid).get();
+        if (!userDoc.exists) continue;
+        data = userDoc.data();
+      }
+      if (data == null) continue;
+
       final map = <String, dynamic>{
         'uid': uid,
         'nickname': data['nickname'] as String? ?? '알 수 없음',
@@ -245,5 +267,3 @@ class RoomService {
     }
   }
 }
-
-

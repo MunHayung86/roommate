@@ -16,6 +16,9 @@ class _RoomPageState extends State<RoomPage> {
   Future<void>? _loadFuture;
   List<Map<String, dynamic>> _members = [];
   List<dynamic> _rules = [];
+  PageController? _memberPageController;
+  double? _memberViewportFraction;
+  int _selectedMemberIndex = 0;
 
   @override
   void initState() {
@@ -39,7 +42,33 @@ class _RoomPageState extends State<RoomPage> {
     if (!mounted) return;
     setState(() {
       _members = members;
+      if (_members.isEmpty) {
+        _selectedMemberIndex = 0;
+      } else if (_selectedMemberIndex >= _members.length) {
+        _selectedMemberIndex = _members.length - 1;
+      }
     });
+  }
+
+  PageController _getMemberPageController(double screenWidth) {
+    final computedFraction = (_cardWidth / screenWidth).clamp(0.65, 1.0);
+    if (_memberPageController == null ||
+        _memberViewportFraction == null ||
+        (_memberViewportFraction! - computedFraction).abs() > 0.001) {
+      _memberPageController?.dispose();
+      _memberViewportFraction = computedFraction;
+      _memberPageController = PageController(
+        viewportFraction: computedFraction,
+        initialPage: _selectedMemberIndex,
+      );
+    }
+    return _memberPageController!;
+  }
+
+  @override
+  void dispose() {
+    _memberPageController?.dispose();
+    super.dispose();
   }
 
   @override
@@ -76,26 +105,31 @@ class _RoomPageState extends State<RoomPage> {
                           height: 232,
                           child: LayoutBuilder(
                             builder: (context, constraints) {
-                              final screenWidth = constraints.maxWidth;
-                              final viewportFraction = _cardWidth / screenWidth;
-                              final count = _members.isEmpty ? 1 : _members.length;
+                              if (_members.isEmpty) {
+                                return const Center(
+                                  child: Text(
+                                    '방에 참여한 룸메이트가 없어요',
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      color: Color(0xff717182),
+                                    ),
+                                    textAlign: TextAlign.center,
+                                  ),
+                                );
+                              }
+
+                              final controller = _getMemberPageController(constraints.maxWidth);
+                              final count = _members.length;
                               return PageView.builder(
-                                controller: PageController(viewportFraction: viewportFraction),
-                                padEnds: false,
+                                controller: controller,
+                                padEnds: true,
+                                onPageChanged: (index) {
+                                  setState(() {
+                                    _selectedMemberIndex = index;
+                                  });
+                                },
                                 itemCount: count,
                                 itemBuilder: (context, index) {
-                                  if (_members.isEmpty) {
-                                    return Center(
-                                      child: Text(
-                                        '방에 참여한 룸메이트가 없어요',
-                                        style: const TextStyle(
-                                          fontSize: 16,
-                                          color: Color(0xff717182),
-                                        ),
-                                        textAlign: TextAlign.center,
-                                      ),
-                                    );
-                                  }
                                   final m = _members[index];
                                   final name = m['nickname'] as String? ?? '알 수 없음';
                                   final photoUrl = m['photoUrl'] as String?;
@@ -109,8 +143,20 @@ class _RoomPageState extends State<RoomPage> {
                                         child: _RoommateCard(
                                           name: name,
                                           photoUrl: photoUrl,
-                                          status: null,
+                                          status: '외출증',
+                                          isSelected: index == _selectedMemberIndex,
                                           onTap: () {
+                                            if (_selectedMemberIndex != index) {
+                                              setState(() {
+                                                _selectedMemberIndex = index;
+                                              });
+                                              controller.animateToPage(
+                                                index,
+                                                duration: const Duration(milliseconds: 260),
+                                                curve: Curves.easeOutCubic,
+                                              );
+                                              return;
+                                            }
                                             showLifestyleBottomSheet(
                                               context,
                                               name: name,
@@ -304,6 +350,7 @@ class _RoommateCard extends StatelessWidget {
   const _RoommateCard({
     required this.name,
     required this.onTap,
+    required this.isSelected,
     this.photoUrl,
     this.status,
   });
@@ -312,6 +359,7 @@ class _RoommateCard extends StatelessWidget {
   final String? photoUrl;
   final String? status;
   final VoidCallback onTap;
+  final bool isSelected;
 
   @override
   Widget build(BuildContext context) {
@@ -328,8 +376,8 @@ class _RoommateCard extends StatelessWidget {
             color: Colors.white,
             borderRadius: BorderRadius.circular(52),
             border: Border.all(
-              color: const Color(0xffE9ECEF),
-              width: 0.65,
+              color: isSelected ? const Color(0xff6C5CE7) : const Color(0xffE9ECEF),
+              width: isSelected ? 2.0 : 0.65,
             ),
           ),
           child: Column(
@@ -375,7 +423,7 @@ class _RoommateCard extends StatelessWidget {
                               width: 96,
                               height: 96,
                               fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) => const Center(
+                              errorBuilder: (context, error, stackTrace) => const Center(
                                 child: Text('😊', style: TextStyle(fontSize: 48)),
                               ),
                             )
@@ -394,7 +442,7 @@ class _RoommateCard extends StatelessWidget {
                           vertical: 5,
                         ),
                         decoration: BoxDecoration(
-                          color: const Color(0xffF5F5F7).withOpacity(0.8),
+                          color: const Color(0xffF5F5F7).withValues(alpha: 0.8),
                           borderRadius: BorderRadius.circular(999),
                         ),
                         child: Text(

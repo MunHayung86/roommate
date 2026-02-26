@@ -8,6 +8,7 @@ class RoommateWakeupItem {
     this.isAlarmOn = false,
     this.profileImageUrl,
     this.isHighlighted = false,
+    this.isSosStyled = false,
   });
 
   /// Firestore document id 또는 고유 식별자
@@ -28,6 +29,9 @@ class RoommateWakeupItem {
   /// 강조 카드 여부 (노란 배경 #FFF9DB). 깨워달라 요청 중인 룸메 등
   final bool isHighlighted;
 
+  /// SOS 버튼 내부와 같은 톤으로 표시할지 여부
+  final bool isSosStyled;
+
   RoommateWakeupItem copyWith({
     String? id,
     String? name,
@@ -35,6 +39,7 @@ class RoommateWakeupItem {
     bool? isAlarmOn,
     String? profileImageUrl,
     bool? isHighlighted,
+    bool? isSosStyled,
   }) {
     return RoommateWakeupItem(
       id: id ?? this.id,
@@ -43,6 +48,7 @@ class RoommateWakeupItem {
       isAlarmOn: isAlarmOn ?? this.isAlarmOn,
       profileImageUrl: profileImageUrl ?? this.profileImageUrl,
       isHighlighted: isHighlighted ?? this.isHighlighted,
+      isSosStyled: isSosStyled ?? this.isSosStyled,
     );
   }
 
@@ -56,6 +62,7 @@ class RoommateWakeupItem {
       isAlarmOn: data['isAlarmOn'] as bool? ?? false,
       profileImageUrl: data['profileImageUrl'] as String?,
       isHighlighted: data['isHighlighted'] as bool? ?? false,
+      isSosStyled: data['isSosStyled'] as bool? ?? false,
     );
   }
 
@@ -67,6 +74,7 @@ class RoommateWakeupItem {
       'isAlarmOn': isAlarmOn,
       'profileImageUrl': profileImageUrl,
       'isHighlighted': isHighlighted,
+      'isSosStyled': isSosStyled,
     };
   }
 }

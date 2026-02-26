@@ -21,6 +21,9 @@ class _LoginPageState extends State<LoginPage> {
         scopes: ['email'],
       );
 
+      // Always force account picker so users can switch accounts reliably.
+      await googleSignIn.signOut();
+
       final GoogleSignInAccount? googleUser =
           await googleSignIn.signIn();
 
