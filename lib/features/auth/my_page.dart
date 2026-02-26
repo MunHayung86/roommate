@@ -109,9 +109,9 @@ class _MyPageState extends State<MyPage> {
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const SizedBox(height: 85),
+          const SizedBox(height: 74),
           Padding(
-            padding: const EdgeInsets.fromLTRB(23.99, 23.99, 23.99, 0),
+            padding: const EdgeInsets.fromLTRB(23.99, 0, 23.99, 0),
             child: const Text(
               '내 정보',
               style: TextStyle(
